@@ -1,16 +1,27 @@
 mod image;
 mod ray;
-mod viewport;
 
 use crate::{
     image::{Color, PPMImage},
     ray::Ray,
-    viewport::Viewport,
 };
 use glam::DVec3;
 use log::{error, info};
 
+fn hit_sphere(center: DVec3, radius: f64, ray: &Ray) -> bool {
+    let oc = center - ray.origin;
+    let a = ray.dir.dot(ray.dir);
+    let b = -2.0 * ray.dir.dot(oc);
+    let c = oc.dot(oc) - radius * radius;
+    let dis = b * b - 4.0 * a * c;
+    dis >= 0.0
+}
+
 fn ray_color(r: &Ray) -> Color {
+    if hit_sphere(DVec3::new(0.0, 0.0, -1.0), 0.5, r) {
+        return Color::new(255, 0, 0);
+    }
+
     let unit_dir = r.dir.normalize();
     let a = 0.5 * (unit_dir.y + 1.0);
     let color = (1.0 - a) * DVec3::ONE + a * DVec3::new(0.5, 0.7, 1.0);
@@ -27,14 +38,8 @@ fn main() {
     image_height = if image_height < 1 { 1 } else { image_height };
 
     let viewport_height = 2.0;
-    let viewport_width = viewport_height * (image_width / image_height) as f64;
+    let viewport_width = viewport_height * (image_width as f64 / image_height as f64);
     let focal_length = 1.0;
-
-    let viewport = Viewport {
-        width: viewport_width,
-        height: viewport_height,
-        focal_length,
-    };
 
     let camera_center = DVec3::new(0.0, 0.0, 0.0);
     let viewport_u = DVec3::new(viewport_width, 0.0, 0.0);
