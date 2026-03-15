@@ -1,3 +1,6 @@
+pub mod hit;
+pub mod interval;
+
 use glam::DVec3;
 
 pub struct Ray {

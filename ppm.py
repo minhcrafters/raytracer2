@@ -24,10 +24,13 @@ def main():
     filename = sys.argv[1]
     width, height, pixel_data = read_ppm(filename)
 
+    scale = 2
+
     pygame.init()
-    screen = pygame.display.set_mode((width, height))
+    screen = pygame.display.set_mode((width * scale, height * scale))
 
     surf = pygame.image.frombytes(pixel_data, (width, height), "RGB")
+    surf = pygame.transform.scale(surf, (width * scale, height * scale))
 
     running = True
     while running:
