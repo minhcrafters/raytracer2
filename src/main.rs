@@ -10,8 +10,6 @@ use crate::{
 use glam::DVec3;
 use log::{error, info};
 
-fn hit_sphere()
-
 fn ray_color(r: &Ray) -> Color {
     let unit_dir = r.dir.normalize();
     let a = 0.5 * (unit_dir.y + 1.0);
