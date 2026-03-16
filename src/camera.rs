@@ -1,6 +1,7 @@
 use glam::{DMat4, DVec3};
 
 use crate::{
+    hdri::Background,
     hittable::Hittable,
     image::{Color, PPMImage},
     ray::{Ray, interval::Interval},
@@ -22,7 +23,7 @@ pub struct Camera {
     pub defocus_angle: f64,
     pub focus_dist: f64,
 
-    pub background: Color,
+    pub background: Background,
 
     image_height: usize,
     center: DVec3,
@@ -40,7 +41,6 @@ pub struct Camera {
 
 impl Camera {
     pub fn new(aspect_ratio: f64, image_width: usize, spp: usize, max_depth: usize) -> Self {
-        let background = Color::new(0.7, 0.8, 1.0);
         Self {
             aspect_ratio,
             image_width,
@@ -52,7 +52,7 @@ impl Camera {
             vup: DVec3::Y,
             defocus_angle: 0.0,
             focus_dist: 10.0,
-            background,
+            background: Background::Color(Color::new(0.7, 0.8, 1.0)),
             image_height: 0,
             pixel_samples_scale: 1.0 / (spp as f64),
             center: DVec3::ZERO,
@@ -197,6 +197,6 @@ impl Camera {
             return emission;
         }
 
-        self.background
+        self.background.sample(r.dir)
     }
 }

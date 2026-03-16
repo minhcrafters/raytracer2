@@ -1,4 +1,5 @@
 mod camera;
+pub mod hdri;
 mod hittable;
 mod image;
 mod material;
@@ -10,9 +11,9 @@ use std::{f64::consts::PI, sync::Arc};
 
 use crate::{
     camera::Camera,
-    hittable::HittableList,
-    hittable::{instance::Instance, model::load_model, quad::Quad},
-    image::Color,
+    hdri::Hdri,
+    hittable::{HittableList, instance::Instance, model::load_model, quad::Quad},
+    image::{Color, PPMImage},
     material::{
         dielectric::Dielectric, diffuse_light::DiffuseLight, lambertian::Lambertian,
         metallic::Metallic,
@@ -22,9 +23,7 @@ use crate::{
 };
 use glam::{DQuat, DVec3};
 
-fn main() {
-    env_logger::init();
-
+fn cornell_box() -> PPMImage {
     let aspect_ratio = 1.0;
     let image_width = 600;
 
@@ -36,7 +35,7 @@ fn main() {
     camera.vup = DVec3::new(0.0, 1.0, 0.0);
 
     camera.defocus_angle = 0.0;
-    camera.background = Color::new(0.0, 0.0, 0.0);
+    camera.background = hdri::Background::Hdri(Hdri::new("golden_gate_hills_2k.hdr"));
 
     let mut world = HittableList::new();
 
@@ -46,28 +45,28 @@ fn main() {
     let light = Arc::new(DiffuseLight::new(Color::new(15.0, 15.0, 15.0)));
 
     // Left wall (green)
-    world.add(Arc::new(Quad::new(
-        DVec3::new(555.0, 0.0, 0.0),
-        DVec3::new(0.0, 555.0, 0.0),
-        DVec3::new(0.0, 0.0, 555.0),
-        Some(green),
-    )));
+    // world.add(Arc::new(Quad::new(
+    //     DVec3::new(555.0, 0.0, 0.0),
+    //     DVec3::new(0.0, 555.0, 0.0),
+    //     DVec3::new(0.0, 0.0, 555.0),
+    //     Some(green),
+    // )));
 
     // Right wall (red)
-    world.add(Arc::new(Quad::new(
-        DVec3::new(0.0, 0.0, 0.0),
-        DVec3::new(0.0, 555.0, 0.0),
-        DVec3::new(0.0, 0.0, 555.0),
-        Some(red),
-    )));
+    // world.add(Arc::new(Quad::new(
+    //     DVec3::new(0.0, 0.0, 0.0),
+    //     DVec3::new(0.0, 555.0, 0.0),
+    //     DVec3::new(0.0, 0.0, 555.0),
+    //     Some(red),
+    // )));
 
     // Ceiling light
-    world.add(Arc::new(Quad::new(
-        DVec3::new(343.0, 554.0, 332.0),
-        DVec3::new(-130.0, 0.0, 0.0),
-        DVec3::new(0.0, 0.0, -105.0),
-        Some(light),
-    )));
+    // world.add(Arc::new(Quad::new(
+    //     DVec3::new(343.0, 554.0, 332.0),
+    //     DVec3::new(-130.0, 0.0, 0.0),
+    //     DVec3::new(0.0, 0.0, -105.0),
+    //     Some(light),
+    // )));
 
     // Floor
     world.add(Arc::new(Quad::new(
@@ -78,20 +77,20 @@ fn main() {
     )));
 
     // Ceiling
-    world.add(Arc::new(Quad::new(
-        DVec3::new(555.0, 555.0, 555.0),
-        DVec3::new(-555.0, 0.0, 0.0),
-        DVec3::new(0.0, 0.0, -555.0),
-        Some(white.clone()),
-    )));
+    // world.add(Arc::new(Quad::new(
+    //     DVec3::new(555.0, 555.0, 555.0),
+    //     DVec3::new(-555.0, 0.0, 0.0),
+    //     DVec3::new(0.0, 0.0, -555.0),
+    //     Some(white.clone()),
+    // )));
 
     // Back wall
-    world.add(Arc::new(Quad::new(
-        DVec3::new(0.0, 0.0, 555.0),
-        DVec3::new(555.0, 0.0, 0.0),
-        DVec3::new(0.0, 555.0, 0.0),
-        Some(white),
-    )));
+    // world.add(Arc::new(Quad::new(
+    //     DVec3::new(0.0, 0.0, 555.0),
+    //     DVec3::new(555.0, 0.0, 0.0),
+    //     DVec3::new(0.0, 555.0, 0.0),
+    //     Some(white),
+    // )));
 
     // N64 logo
     let logo_mat = Arc::new(Metallic::new(Color::new(0.8, 0.8, 0.8), 0.01));
@@ -107,7 +106,13 @@ fn main() {
     }
 
     let bvh_world = BvhNode::from_list(&world);
-    let image = camera.render(&bvh_world);
+    camera.render(&bvh_world)
+}
+
+fn main() {
+    env_logger::init();
+
+    let image = cornell_box();
 
     image.save("output.ppm").expect("Failed to save image");
 
