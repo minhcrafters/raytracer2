@@ -1,11 +1,8 @@
 use glam::DVec3;
 
-use crate::{
-    image::Color,
-    material::Material,
-    ray::{Ray, hittable::HitRecord},
-    utils::random_f64,
-};
+use crate::{image::Color, material::Material, ray::Ray, utils::random_f64};
+
+use crate::hittable::HitRecord;
 
 pub struct Dielectric {
     pub ior: f64,

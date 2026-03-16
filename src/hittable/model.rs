@@ -3,9 +3,10 @@ use std::sync::Arc;
 use asset_importer::{Importer, postprocess::PostProcessSteps};
 use glam::DVec3;
 
-use crate::{material::Material, ray::hittable::HittableList};
-
-use super::triangle::Triangle;
+use crate::{
+    hittable::{HittableList, triangle::Triangle},
+    material::Material,
+};
 
 pub fn load_model(
     path: &str,

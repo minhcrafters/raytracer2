@@ -2,16 +2,12 @@ use glam::DVec3;
 use std::sync::Arc;
 
 use crate::{
+    hittable::{HitRecord, Hittable},
     material::Material,
-    ray::{
-        Ray,
-        aabb::Aabb,
-        hittable::{HitRecord, Hittable},
-        interval::Interval,
-    },
+    ray::{Ray, aabb::Aabb, interval::Interval},
 };
 
-pub struct Quad {
+pub struct Triangle {
     pub q: DVec3,
     pub u: DVec3,
     pub v: DVec3,
@@ -22,15 +18,15 @@ pub struct Quad {
     w: DVec3,
 }
 
-impl Quad {
+impl Triangle {
     pub fn new(q: DVec3, u: DVec3, v: DVec3, material: Option<Arc<dyn Material>>) -> Self {
         let n = u.cross(v);
         let normal = n.normalize();
         let d = normal.dot(q);
         let w = n / n.length_squared();
 
-        let bbox_diagonal1 = Aabb::from_points(q, q + u + v);
-        let bbox_diagonal2 = Aabb::from_points(q + u, q + v);
+        let bbox_diagonal1 = Aabb::from_points(q, q + u);
+        let bbox_diagonal2 = Aabb::from_points(q, q + v);
         let mut bbox = Aabb::from_aabbs(&bbox_diagonal1, &bbox_diagonal2);
 
         let delta = 0.0001;
@@ -57,7 +53,7 @@ impl Quad {
     }
 }
 
-impl Hittable for Quad {
+impl Hittable for Triangle {
     fn hit(&self, r: &Ray, interval: &Interval) -> Option<HitRecord> {
         let denom = self.normal.dot(r.dir);
 
@@ -78,7 +74,8 @@ impl Hittable for Quad {
         let alpha = self.w.dot(planar_hitpt_vector.cross(self.v));
         let beta = self.w.dot(self.u.cross(planar_hitpt_vector));
 
-        if alpha < 0.0 || alpha > 1.0 || beta < 0.0 || beta > 1.0 {
+        // For a triangle, alpha + beta must be less than or equal to 1.0
+        if alpha < 0.0 || beta < 0.0 || (alpha + beta) > 1.0 {
             return None;
         }
 

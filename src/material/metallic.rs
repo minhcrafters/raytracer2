@@ -1,8 +1,5 @@
 use crate::{
-    image::Color,
-    material::Material,
-    ray::{Ray, hittable::HitRecord},
-    utils::random_unit_vec3,
+    hittable::HitRecord, image::Color, material::Material, ray::Ray, utils::random_unit_vec3,
 };
 
 pub struct Metallic {

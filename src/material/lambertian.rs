@@ -1,7 +1,8 @@
 use crate::{
+    hittable::HitRecord,
     image::Color,
     material::Material,
-    ray::{Ray, hittable::HitRecord},
+    ray::Ray,
     utils::{near_zero, random_unit_vec3},
 };
 

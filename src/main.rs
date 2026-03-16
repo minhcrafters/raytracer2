@@ -1,8 +1,8 @@
 mod camera;
+mod hittable;
 mod image;
 mod material;
 mod optim;
-mod primitives;
 mod ray;
 mod utils;
 
@@ -10,14 +10,15 @@ use std::{f64::consts::PI, sync::Arc};
 
 use crate::{
     camera::Camera,
+    hittable::HittableList,
+    hittable::{instance::Instance, model::load_model, quad::Quad},
     image::Color,
     material::{
         dielectric::Dielectric, diffuse_light::DiffuseLight, lambertian::Lambertian,
         metallic::Metallic,
     },
     optim::bvh::BvhNode,
-    primitives::{instance::Instance, model::load_model, quad::Quad},
-    ray::{hittable::HittableList, transform::Transform},
+    ray::transform::Transform,
 };
 use glam::{DQuat, DVec3};
 
@@ -27,7 +28,7 @@ fn main() {
     let aspect_ratio = 1.0;
     let image_width = 600;
 
-    let mut camera = Camera::new(aspect_ratio, image_width, 200, 50);
+    let mut camera = Camera::new(aspect_ratio, image_width, 1000, 50);
 
     camera.fov = 40.0;
     camera.look_from = DVec3::new(278.0, 278.0, -800.0);
@@ -93,12 +94,12 @@ fn main() {
     )));
 
     // N64 logo
-    let logo_mat = Arc::new(Metallic::new(Color::new(0.8, 0.8, 0.8), 0.2));
+    let logo_mat = Arc::new(Metallic::new(Color::new(0.8, 0.8, 0.8), 0.01));
     if let Ok(logo_mesh) = load_model("obj/n64_logo.obj", logo_mat) {
         let transform = Transform::new()
             .scale(DVec3::splat(250.0))
             .rotate(DQuat::from_rotation_y(PI / 6.0))
-            .translate(DVec3::new(278.0, 150.0, 278.0));
+            .translate(DVec3::new(278.0, 0.0, 278.0));
         world.add(Arc::new(Instance::new(
             Arc::new(BvhNode::from_list(&logo_mesh)),
             transform,

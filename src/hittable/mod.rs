@@ -1,9 +1,15 @@
+pub mod instance;
+pub mod model;
+pub mod quad;
+pub mod sphere;
+pub mod triangle;
+
 use glam::DVec3;
 use std::sync::Arc;
 
 use crate::{material::Material, ray::interval::Interval};
 
-use super::{Ray, aabb::Aabb};
+use super::{ray::Ray, ray::aabb::Aabb};
 
 pub struct HitRecord {
     pub point: DVec3,

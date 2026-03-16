@@ -1,8 +1,9 @@
 use glam::{DMat4, DVec3};
 
 use crate::{
+    hittable::Hittable,
     image::{Color, PPMImage},
-    ray::{Ray, hittable::Hittable, interval::Interval},
+    ray::{Ray, interval::Interval},
     utils::{random_f64, random_in_unit_disk},
 };
 

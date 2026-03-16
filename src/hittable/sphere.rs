@@ -3,13 +3,9 @@ use std::sync::Arc;
 use glam::DVec3;
 
 use crate::{
+    hittable::{HitRecord, Hittable},
     material::Material,
-    ray::{
-        Ray,
-        aabb::Aabb,
-        hittable::{HitRecord, Hittable},
-        interval::Interval,
-    },
+    ray::{Ray, aabb::Aabb, interval::Interval},
 };
 
 pub struct Sphere {

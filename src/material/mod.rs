@@ -3,10 +3,7 @@ pub mod diffuse_light;
 pub mod lambertian;
 pub mod metallic;
 
-use crate::{
-    image::Color,
-    ray::{Ray, hittable::HitRecord},
-};
+use crate::{hittable::HitRecord, image::Color, ray::Ray};
 
 pub trait Material: Send + Sync {
     /// Scatters an incident ray against the material.

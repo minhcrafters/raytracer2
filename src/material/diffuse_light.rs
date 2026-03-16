@@ -1,7 +1,4 @@
-use crate::{
-    image::Color,
-    ray::{Ray, hittable::HitRecord},
-};
+use crate::{hittable::HitRecord, image::Color, ray::Ray};
 
 use super::Material;
 

@@ -1,10 +1,5 @@
-use crate::ray::{
-    Ray,
-    aabb::Aabb,
-    hittable::{HitRecord, Hittable},
-    interval::Interval,
-    transform::Transform,
-};
+use crate::hittable::{HitRecord, Hittable};
+use crate::ray::{Ray, aabb::Aabb, interval::Interval, transform::Transform};
 use std::sync::Arc;
 
 pub struct Instance {

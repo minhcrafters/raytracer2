@@ -1,12 +1,8 @@
 use std::sync::Arc;
 
 use crate::{
-    ray::{
-        Ray,
-        aabb::Aabb,
-        hittable::{HitRecord, Hittable, HittableList},
-        interval::Interval,
-    },
+    hittable::{HitRecord, Hittable, HittableList},
+    ray::{Ray, aabb::Aabb, interval::Interval},
     utils::random_f64_range,
 };
 
