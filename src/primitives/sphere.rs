@@ -13,13 +13,51 @@ use crate::{
 
 pub struct Sphere {
     pub center: DVec3,
+    pub center_vec: DVec3,
+    pub is_moving: bool,
     pub radius: f64,
     pub material: Option<Arc<dyn Material>>,
 }
 
+impl Sphere {
+    pub fn stationary(center: DVec3, radius: f64, material: Option<Arc<dyn Material>>) -> Self {
+        Self {
+            center,
+            center_vec: DVec3::ZERO,
+            is_moving: false,
+            radius,
+            material,
+        }
+    }
+
+    pub fn moving(
+        center1: DVec3,
+        center2: DVec3,
+        radius: f64,
+        material: Option<Arc<dyn Material>>,
+    ) -> Self {
+        Self {
+            center: center1,
+            center_vec: center2 - center1,
+            is_moving: true,
+            radius,
+            material,
+        }
+    }
+
+    pub fn get_center(&self, time: f64) -> DVec3 {
+        if self.is_moving {
+            self.center + time * self.center_vec
+        } else {
+            self.center
+        }
+    }
+}
+
 impl Hittable for Sphere {
     fn hit(&self, r: &Ray, interval: &Interval) -> Option<HitRecord> {
-        let oc = self.center - r.origin;
+        let current_center = self.get_center(r.time);
+        let oc = current_center - r.origin;
         let a = r.dir.length_squared();
         let h = r.dir.dot(oc);
         let c = oc.length_squared() - self.radius * self.radius;
@@ -41,7 +79,7 @@ impl Hittable for Sphere {
         }
 
         let point = r.at(root);
-        let normal = (point - self.center) / self.radius;
+        let normal = (point - current_center) / self.radius;
 
         let mut rec = HitRecord {
             point,

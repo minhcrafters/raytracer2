@@ -127,7 +127,7 @@ impl Camera {
             + (y as f64 + offset.y) * self.pixel_delta_v)
             - ray_origin;
 
-        Ray::new(ray_origin, ray_dir)
+        Ray::new(ray_origin, ray_dir, crate::utils::random_f64())
     }
 
     fn sample_square(&self) -> DVec3 {

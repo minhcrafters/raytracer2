@@ -22,7 +22,7 @@ impl Material for Metallic {
     fn scatter(&self, ray_in: &Ray, hit_record: &HitRecord) -> Option<(Color, Ray)> {
         let reflected =
             ray_in.dir.reflect(hit_record.normal).normalize() + self.fuzz * random_unit_vec3();
-        let scattered_ray = Ray::new(hit_record.point, reflected);
+        let scattered_ray = Ray::new(hit_record.point, reflected, ray_in.time);
 
         if scattered_ray.dir.dot(hit_record.normal) > 0.0 {
             Some((self.albedo, scattered_ray))
