@@ -1,7 +1,4 @@
-use std::f64::INFINITY;
-
-use glam::DVec3;
-use log::info;
+use glam::{DMat4, DVec3};
 
 use crate::{
     image::{Color, PPMImage},
@@ -28,13 +25,13 @@ pub struct Camera {
 
     image_height: usize,
     center: DVec3,
-    pixel_delta_u: DVec3,
-    pixel_delta_v: DVec3,
-    u: DVec3,
-    v: DVec3,
-    w: DVec3,
-    pixel00_loc: DVec3,
     pixel_samples_scale: f64,
+
+    // MVP transformation matrices
+    pub view_mat: DMat4,
+    pub inv_view_mat: DMat4,
+    pub proj_mat: DMat4,
+    pub inv_proj_mat: DMat4,
 
     defocus_disk_u: DVec3,
     defocus_disk_v: DVec3,
@@ -58,12 +55,12 @@ impl Camera {
             image_height: 0,
             pixel_samples_scale: 1.0 / (spp as f64),
             center: DVec3::ZERO,
-            pixel_delta_u: DVec3::ZERO,
-            pixel_delta_v: DVec3::ZERO,
-            pixel00_loc: DVec3::ZERO,
-            u: DVec3::ZERO,
-            v: DVec3::ZERO,
-            w: DVec3::ZERO,
+
+            view_mat: DMat4::IDENTITY,
+            inv_view_mat: DMat4::IDENTITY,
+            proj_mat: DMat4::IDENTITY,
+            inv_proj_mat: DMat4::IDENTITY,
+
             defocus_disk_u: DVec3::ZERO,
             defocus_disk_v: DVec3::ZERO,
         }
@@ -91,47 +88,60 @@ impl Camera {
     fn init(&mut self) {
         let image_height = (self.image_width as f64 / self.aspect_ratio) as usize;
         self.image_height = if image_height < 1 { 1 } else { image_height };
+        let actual_aspect_ratio = self.image_width as f64 / self.image_height as f64;
 
         self.center = self.look_from;
 
-        let theta = self.fov.to_radians();
-        let h = (theta / 2.0).tan();
-        let viewport_height = 2.0 * h * self.focus_dist;
-        let viewport_width = viewport_height * (self.image_width as f64 / self.image_height as f64);
+        // View Matrix
+        self.view_mat = DMat4::look_at_rh(self.look_from, self.look_at, self.vup);
+        self.inv_view_mat = self.view_mat.inverse();
 
-        self.w = (self.look_from - self.look_at).normalize();
-        self.u = self.vup.cross(self.w).normalize();
-        self.v = self.w.cross(self.u);
+        // Projection Matrix
+        self.proj_mat =
+            DMat4::perspective_rh(self.fov.to_radians(), actual_aspect_ratio, 0.001, 10000.0);
+        self.inv_proj_mat = self.proj_mat.inverse();
 
-        let viewport_u = viewport_width * self.u;
-        let viewport_v = viewport_height * -self.v;
-
-        self.pixel_delta_u = viewport_u / self.image_width as f64;
-        self.pixel_delta_v = viewport_v / self.image_height as f64;
-
-        let viewport_upper_left =
-            self.center - (self.focus_dist * self.w) - viewport_u / 2.0 - viewport_v / 2.0;
-        self.pixel00_loc = viewport_upper_left + 0.5 * (self.pixel_delta_u + self.pixel_delta_v);
+        // Defocus blur basis
+        let w = (self.look_from - self.look_at).normalize();
+        let u = self.vup.cross(w).normalize();
+        let v = w.cross(u);
 
         let defocus_radius = self.focus_dist * (self.defocus_angle / 2.0).to_radians().tan();
-        self.defocus_disk_u = self.u * defocus_radius;
-        self.defocus_disk_v = self.v * defocus_radius;
+        self.defocus_disk_u = u * defocus_radius;
+        self.defocus_disk_v = v * defocus_radius;
     }
 
     fn get_ray(&self, x: usize, y: usize) -> Ray {
         let offset = self.sample_square();
+
+        // Normalized Device Coordinates (NDC)
+        let s = (x as f64 + offset.x) / self.image_width as f64;
+        let t = (y as f64 + offset.y) / self.image_height as f64;
+
+        // Map s, t to [-1, 1]. In rendering usually top-left is (0,0) and +Y is up in 3D.
+        let ndc_x = s * 2.0 - 1.0;
+        let ndc_y = 1.0 - t * 2.0;
+
+        // Generate target point in view space by un-projecting
+        // Ray starts at origin (0,0,0) in view space, goes to projected screen plane.
+        let target_view = self
+            .inv_proj_mat
+            .project_point3(DVec3::new(ndc_x, ndc_y, -1.0));
+        let ray_dir_view = target_view.normalize();
+
+        // Translate view direction back to world space
+        let ray_dir_world = self
+            .inv_view_mat
+            .transform_vector3(ray_dir_view)
+            .normalize();
+
         let ray_origin = if self.defocus_angle <= 0.0 {
             self.center
         } else {
             self.defocus_disk_sample()
         };
 
-        let ray_dir = (self.pixel00_loc
-            + (x as f64 + offset.x) * self.pixel_delta_u
-            + (y as f64 + offset.y) * self.pixel_delta_v)
-            - ray_origin;
-
-        Ray::new(ray_origin, ray_dir, crate::utils::random_f64())
+        Ray::new(ray_origin, ray_dir_world, crate::utils::random_f64())
     }
 
     fn sample_square(&self) -> DVec3 {

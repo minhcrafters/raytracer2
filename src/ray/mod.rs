@@ -1,3 +1,4 @@
+pub mod transform;
 pub mod aabb;
 pub mod hittable;
 pub mod interval;
