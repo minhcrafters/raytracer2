@@ -1,5 +1,3 @@
-use std::f64::EPSILON;
-
 use crate::{
     image::Color,
     material::Material,

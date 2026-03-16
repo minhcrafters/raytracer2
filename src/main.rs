@@ -1,6 +1,7 @@
 mod camera;
 mod image;
 mod material;
+mod optim;
 mod primitives;
 mod ray;
 mod utils;
@@ -11,6 +12,7 @@ use crate::{
     camera::Camera,
     image::Color,
     material::{Material, dielectric::Dielectric, lambertian::Lambertian, metallic::Metallic},
+    optim::bvh::BvhNode,
     primitives::sphere::Sphere,
     ray::hittable::HittableList,
     utils::{random_f64, random_f64_range, random_vec3, random_vec3_range},
@@ -37,7 +39,7 @@ fn main() {
 
     let mut world = HittableList::new();
 
-    world.add(Box::new(Sphere::stationary(
+    world.add(Arc::new(Sphere::stationary(
         DVec3::new(0.0, -1000.0, 0.0),
         1000.0,
         Some(ground_mat),
@@ -59,7 +61,7 @@ fn main() {
                     let albedo = Color::from_vec3(random_vec3() * random_vec3());
                     sphere_mat = Arc::new(Lambertian::new(albedo));
                     let center2 = center + DVec3::new(0.0, random_f64_range(0.0, 0.5), 0.0);
-                    world.add(Box::new(Sphere::moving(
+                    world.add(Arc::new(Sphere::moving(
                         center,
                         center2,
                         0.2,
@@ -69,34 +71,35 @@ fn main() {
                     let albedo = Color::from_vec3(random_vec3_range(0.5, 1.0));
                     let fuzz = random_f64_range(0.0, 0.5);
                     sphere_mat = Arc::new(Metallic::new(albedo, fuzz));
-                    world.add(Box::new(Sphere::stationary(center, 0.2, Some(sphere_mat))));
+                    world.add(Arc::new(Sphere::stationary(center, 0.2, Some(sphere_mat))));
                 } else {
                     sphere_mat = Arc::new(Dielectric::new(1.5));
-                    world.add(Box::new(Sphere::stationary(center, 0.2, Some(sphere_mat))));
+                    world.add(Arc::new(Sphere::stationary(center, 0.2, Some(sphere_mat))));
                 }
             }
         }
     }
 
-    world.add(Box::new(Sphere::stationary(
+    world.add(Arc::new(Sphere::stationary(
         DVec3::new(0.0, 1.0, 0.0),
         1.0,
         Some(Arc::new(Dielectric::new(1.5))),
     )));
 
-    world.add(Box::new(Sphere::stationary(
+    world.add(Arc::new(Sphere::stationary(
         DVec3::new(-4.0, 1.0, 0.0),
         1.0,
         Some(Arc::new(Lambertian::new(Color::new(0.4, 0.2, 0.1)))),
     )));
 
-    world.add(Box::new(Sphere::stationary(
+    world.add(Arc::new(Sphere::stationary(
         DVec3::new(4.0, 1.0, 0.0),
         1.0,
         Some(Arc::new(Metallic::new(Color::new(1.0, 1.0, 1.0), 0.0))),
     )));
 
-    let image = camera.render(&world);
+    let bvh_world = BvhNode::from_list(&world);
+    let image = camera.render(&bvh_world);
 
     let filename = format!("output.ppm");
     image.save(&filename).expect("Failed to save image");

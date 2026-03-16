@@ -30,7 +30,7 @@ pub trait Hittable {
 }
 
 pub struct HittableList {
-    pub objects: Vec<Box<dyn Hittable>>,
+    pub objects: Vec<Arc<dyn Hittable>>,
     pub bbox: Aabb,
 }
 
@@ -42,7 +42,7 @@ impl HittableList {
         }
     }
 
-    pub fn add(&mut self, object: Box<dyn Hittable>) {
+    pub fn add(&mut self, object: Arc<dyn Hittable>) {
         self.bbox = Aabb::from_aabbs(&self.bbox, &object.bounding_box());
         self.objects.push(object);
     }

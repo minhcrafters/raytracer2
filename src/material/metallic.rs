@@ -1,10 +1,8 @@
-use std::f64::EPSILON;
-
 use crate::{
     image::Color,
     material::Material,
     ray::{Ray, hittable::HitRecord},
-    utils::{near_zero, random_unit_vec3},
+    utils::random_unit_vec3,
 };
 
 pub struct Metallic {
