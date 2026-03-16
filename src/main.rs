@@ -99,7 +99,7 @@ fn main() {
     world.add(Box::new(Sphere {
         center: DVec3::new(4.0, 1.0, 0.0),
         radius: 1.0,
-        material: Some(Arc::new(Metallic::new(Color::new(0.7, 0.6, 0.5), 0.0))),
+        material: Some(Arc::new(Metallic::new(Color::new(1.0, 1.0, 1.0), 0.0))),
     }));
 
     let image = camera.render(&world);
