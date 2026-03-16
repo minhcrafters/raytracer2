@@ -1,10 +1,9 @@
 use glam::DVec3;
-
 use std::sync::Arc;
 
 use crate::{material::Material, ray::interval::Interval};
 
-use super::Ray;
+use super::{Ray, aabb::Aabb};
 
 pub struct HitRecord {
     pub point: DVec3,
@@ -27,25 +26,30 @@ impl HitRecord {
 
 pub trait Hittable {
     fn hit(&self, r: &Ray, interval: &Interval) -> Option<HitRecord>;
+    fn bounding_box(&self) -> Aabb;
 }
 
 pub struct HittableList {
     pub objects: Vec<Box<dyn Hittable>>,
+    pub bbox: Aabb,
 }
 
 impl HittableList {
     pub fn new() -> Self {
         Self {
             objects: Vec::new(),
+            bbox: Aabb::default(),
         }
     }
 
     pub fn add(&mut self, object: Box<dyn Hittable>) {
+        self.bbox = Aabb::from_aabbs(&self.bbox, &object.bounding_box());
         self.objects.push(object);
     }
 
     pub fn clear(&mut self) {
         self.objects.clear();
+        self.bbox = Aabb::default();
     }
 }
 
@@ -61,5 +65,9 @@ impl Hittable for HittableList {
         }
 
         hit_record
+    }
+
+    fn bounding_box(&self) -> Aabb {
+        self.bbox
     }
 }

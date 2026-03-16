@@ -6,6 +6,7 @@ use crate::{
     material::Material,
     ray::{
         Ray,
+        aabb::Aabb,
         hittable::{HitRecord, Hittable},
         interval::Interval,
     },
@@ -17,16 +18,20 @@ pub struct Sphere {
     pub is_moving: bool,
     pub radius: f64,
     pub material: Option<Arc<dyn Material>>,
+    pub bbox: Aabb,
 }
 
 impl Sphere {
     pub fn stationary(center: DVec3, radius: f64, material: Option<Arc<dyn Material>>) -> Self {
+        let rvec = DVec3::new(radius, radius, radius);
+        let bbox = Aabb::from_points(center - rvec, center + rvec);
         Self {
             center,
             center_vec: DVec3::ZERO,
             is_moving: false,
             radius,
             material,
+            bbox,
         }
     }
 
@@ -36,12 +41,17 @@ impl Sphere {
         radius: f64,
         material: Option<Arc<dyn Material>>,
     ) -> Self {
+        let rvec = DVec3::new(radius, radius, radius);
+        let box1 = Aabb::from_points(center1 - rvec, center1 + rvec);
+        let box2 = Aabb::from_points(center2 - rvec, center2 + rvec);
+        let bbox = Aabb::from_aabbs(&box1, &box2);
         Self {
             center: center1,
             center_vec: center2 - center1,
             is_moving: true,
             radius,
             material,
+            bbox,
         }
     }
 
@@ -92,5 +102,9 @@ impl Hittable for Sphere {
         rec.set_face_normal(r, normal);
 
         Some(rec)
+    }
+
+    fn bounding_box(&self) -> Aabb {
+        self.bbox
     }
 }
