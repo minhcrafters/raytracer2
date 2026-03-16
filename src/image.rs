@@ -3,6 +3,7 @@ use std::io::Write;
 use std::ops::{Add, Div, Mul, Sub};
 
 use glam::DVec3;
+use image::{Rgb, RgbImage};
 
 use crate::utils::linear_to_gamma;
 
@@ -191,5 +192,16 @@ impl PPMImage {
         writeln!(file, "255")?;
         file.write_all(&self.data)?;
         Ok(())
+    }
+
+    pub fn to_rgb_image(&self) -> RgbImage {
+        let mut img = RgbImage::new(self.width as u32, self.height as u32);
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let color = self.get_pixel(x, y);
+                img.put_pixel(x as u32, y as u32, Rgb(color.to_tuple().into()));
+            }
+        }
+        img
     }
 }

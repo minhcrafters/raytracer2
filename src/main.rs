@@ -27,7 +27,7 @@ fn main() {
     let aspect_ratio = 1.0;
     let image_width = 600;
 
-    let mut camera = Camera::new(aspect_ratio, image_width, 100, 50);
+    let mut camera = Camera::new(aspect_ratio, image_width, 200, 50);
 
     camera.fov = 40.0;
     camera.look_from = DVec3::new(278.0, 278.0, -800.0);
@@ -108,7 +108,12 @@ fn main() {
     let bvh_world = BvhNode::from_list(&world);
     let image = camera.render(&bvh_world);
 
-    let filename = format!("output.ppm");
-    image.save(&filename).expect("Failed to save image");
+    image.save("output.ppm").expect("Failed to save image");
+
+    image
+        .to_rgb_image()
+        .save("output.png")
+        .expect("Failed to save png");
+
     println!("done");
 }
