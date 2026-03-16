@@ -71,17 +71,40 @@ impl Camera {
 
         let mut image = PPMImage::new(self.image_width, self.image_height);
 
-        for y in 0..image.height {
-            print!("\rScanlines remaining: {}", image.height - y);
-            for x in 0..image.width {
-                let mut pixel_color = Color::new(0.0, 0.0, 0.0);
-                for _ in 0..self.spp {
-                    let ray = self.get_ray(x, y);
-                    pixel_color = pixel_color + self.ray_color(&ray, self.max_depth, world);
-                }
-                image.set_pixel(x, y, &(pixel_color * self.pixel_samples_scale));
-            }
+        use rayon::prelude::*;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let this = &*self;
+        let lines_completed = AtomicUsize::new(0);
+        use std::io::Write;
+
+        let pixels: Vec<_> = (0..image.height)
+            .into_par_iter()
+            .map(|y| {
+                let row_pixels: Vec<_> = (0..image.width)
+                    .map(|x| {
+                        let mut pixel_color = Color::new(0.0, 0.0, 0.0);
+                        for _ in 0..this.spp {
+                            let ray = this.get_ray(x, y);
+                            pixel_color = pixel_color + this.ray_color(&ray, this.max_depth, world);
+                        }
+                        (x, y, pixel_color * this.pixel_samples_scale)
+                    })
+                    .collect();
+
+                let completed = lines_completed.fetch_add(1, Ordering::Relaxed) + 1;
+                print!("\rScanlines remaining: {} ", image.height - completed);
+                let _ = std::io::stdout().flush();
+
+                row_pixels
+            })
+            .flatten()
+            .collect();
+
+        for (x, y, color) in pixels {
+            image.set_pixel(x, y, &color);
         }
+
         image
     }
 
@@ -101,7 +124,7 @@ impl Camera {
             DMat4::perspective_rh(self.fov.to_radians(), actual_aspect_ratio, 0.001, 10000.0);
         self.inv_proj_mat = self.proj_mat.inverse();
 
-        // Defocus blur basis
+        // Defocus blur
         let w = (self.look_from - self.look_at).normalize();
         let u = self.vup.cross(w).normalize();
         let v = w.cross(u);
