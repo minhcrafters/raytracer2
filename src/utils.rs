@@ -41,6 +41,21 @@ pub fn random_on_hemisphere(normal: DVec3) -> DVec3 {
     }
 }
 
+pub fn random_in_unit_disk() -> DVec3 {
+    while true {
+        let p = DVec3::new(
+            random_f64_range(-1.0, 1.0),
+            random_f64_range(-1.0, 1.0),
+            0.0,
+        );
+
+        if p.length_squared() < 1.0 {
+            return p;
+        }
+    }
+    DVec3::ZERO
+}
+
 pub fn linear_to_gamma(linear: f64) -> f64 {
     if linear > 0.0 {
         linear.powf(1.0 / 2.2)

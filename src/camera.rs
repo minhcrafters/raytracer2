@@ -1,16 +1,12 @@
-use std::f64::EPSILON;
+use std::f64::INFINITY;
 
 use glam::DVec3;
 use log::info;
 
 use crate::{
     image::{Color, PPMImage},
-    ray::{
-        Ray,
-        hit::{self, Hittable},
-        interval::Interval,
-    },
-    utils::{random_f64, random_on_hemisphere, random_unit_vec3},
+    ray::{Ray, hittable::Hittable, interval::Interval},
+    utils::{random_f64, random_in_unit_disk},
 };
 
 pub struct Camera {
@@ -19,12 +15,27 @@ pub struct Camera {
     pub spp: usize,
     pub max_depth: usize,
 
+    pub fov: f64,
+
+    pub look_from: DVec3,
+    pub look_at: DVec3,
+    pub up: DVec3,
+
+    pub defocus_angle: f64,
+    pub focus_dist: f64,
+
     image_height: usize,
     center: DVec3,
     pixel_delta_u: DVec3,
     pixel_delta_v: DVec3,
+    u: DVec3,
+    v: DVec3,
+    w: DVec3,
     pixel00_loc: DVec3,
     pixel_samples_scale: f64,
+
+    defocus_disk_u: DVec3,
+    defocus_disk_v: DVec3,
 }
 
 impl Camera {
@@ -34,12 +45,23 @@ impl Camera {
             image_width,
             spp,
             max_depth,
+            fov: 90.0,
+            look_from: DVec3::new(0.0, 0.0, 5.0),
+            look_at: DVec3::new(0.0, 0.0, 0.0),
+            up: DVec3::Y,
+            defocus_angle: 0.0,
+            focus_dist: INFINITY,
             image_height: 0,
             pixel_samples_scale: 1.0 / (spp as f64),
             center: DVec3::ZERO,
             pixel_delta_u: DVec3::ZERO,
             pixel_delta_v: DVec3::ZERO,
             pixel00_loc: DVec3::ZERO,
+            u: DVec3::ZERO,
+            v: DVec3::ZERO,
+            w: DVec3::ZERO,
+            defocus_disk_u: DVec3::ZERO,
+            defocus_disk_v: DVec3::ZERO,
         }
     }
 
@@ -66,33 +88,55 @@ impl Camera {
         let image_height = (self.image_width as f64 / self.aspect_ratio) as usize;
         self.image_height = if image_height < 1 { 1 } else { image_height };
 
-        let viewport_height = 2.0;
-        let viewport_width = viewport_height * (self.image_width as f64 / self.image_height as f64);
-        let focal_length = 1.0;
+        self.center = self.look_from;
 
-        self.center = DVec3::new(0.0, 0.0, 0.0);
-        let viewport_u = DVec3::new(viewport_width, 0.0, 0.0);
-        let viewport_v = DVec3::new(0.0, -viewport_height, 0.0);
+        let theta = self.fov.to_radians();
+        let h = (theta / 2.0).tan();
+        let viewport_height = 2.0 * h * self.focus_dist;
+        let viewport_width = viewport_height * (self.image_width as f64 / self.image_height as f64);
+
+        self.w = (self.look_from - self.look_at).normalize();
+        self.u = self.up.cross(self.w).normalize();
+        self.v = self.w.cross(self.u);
+
+        let viewport_u = viewport_width * self.u;
+        let viewport_v = viewport_height * -self.v;
 
         self.pixel_delta_u = viewport_u / self.image_width as f64;
         self.pixel_delta_v = viewport_v / self.image_height as f64;
 
         let viewport_upper_left =
-            self.center - DVec3::new(0.0, 0.0, focal_length) - viewport_u / 2.0 - viewport_v / 2.0;
+            self.center - (self.focus_dist * self.w) - viewport_u / 2.0 - viewport_v / 2.0;
         self.pixel00_loc = viewport_upper_left + 0.5 * (self.pixel_delta_u + self.pixel_delta_v);
+
+        let defocus_radius = self.focus_dist * (self.defocus_angle / 2.0).to_radians().tan();
+        self.defocus_disk_u = self.u * defocus_radius;
+        self.defocus_disk_v = self.v * defocus_radius;
     }
 
     fn get_ray(&self, x: usize, y: usize) -> Ray {
         let offset = self.sample_square();
+        let ray_origin = if self.defocus_angle <= 0.0 {
+            self.center
+        } else {
+            self.defocus_disk_sample()
+        };
+
         let ray_dir = (self.pixel00_loc
             + (x as f64 + offset.x) * self.pixel_delta_u
             + (y as f64 + offset.y) * self.pixel_delta_v)
-            - self.center;
-        Ray::new(self.center, ray_dir)
+            - ray_origin;
+
+        Ray::new(ray_origin, ray_dir)
     }
 
     fn sample_square(&self) -> DVec3 {
         DVec3::new(random_f64() - 0.5, random_f64() - 0.5, 0.0)
+    }
+
+    fn defocus_disk_sample(&self) -> DVec3 {
+        let p = random_in_unit_disk();
+        self.center + (p.x * self.defocus_disk_u) + (p.y * self.defocus_disk_v)
     }
 
     fn ray_color(r: &Ray, depth: usize, world: &impl Hittable) -> Color {

@@ -3,7 +3,7 @@ use std::f64::EPSILON;
 use crate::{
     image::Color,
     material::Material,
-    ray::{Ray, hit::HitRecord},
+    ray::{Ray, hittable::HitRecord},
     utils::{near_zero, random_unit_vec3},
 };
 

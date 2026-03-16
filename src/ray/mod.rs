@@ -1,4 +1,4 @@
-pub mod hit;
+pub mod hittable;
 pub mod interval;
 
 use glam::DVec3;

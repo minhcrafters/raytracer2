@@ -24,13 +24,15 @@ def main():
     filename = sys.argv[1]
     width, height, pixel_data = read_ppm(filename)
 
-    scale = 2
+    scale = 1
 
     pygame.init()
     screen = pygame.display.set_mode((width * scale, height * scale))
 
     surf = pygame.image.frombytes(pixel_data, (width, height), "RGB")
     surf = pygame.transform.scale(surf, (width * scale, height * scale))
+
+    clock = pygame.time.Clock()
 
     running = True
     while running:
@@ -40,6 +42,7 @@ def main():
 
         screen.blit(surf, (0, 0))
         pygame.display.flip()
+        clock.tick(10)
 
     pygame.quit()
 

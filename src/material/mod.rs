@@ -1,9 +1,10 @@
+pub mod dielectric;
 pub mod lambertian;
 pub mod metallic;
 
 use crate::{
     image::Color,
-    ray::{Ray, hit::HitRecord},
+    ray::{Ray, hittable::HitRecord},
 };
 
 pub trait Material: Send + Sync {
