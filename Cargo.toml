@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+asset-importer = { version = "0.7.0", features = ["static-link"] }
 env_logger = "0.11.9"
 glam = "0.32.1"
 image = "0.25.10"

@@ -10,6 +10,8 @@ pub struct HitRecord {
     pub normal: DVec3,
     pub material: Option<Arc<dyn Material>>,
     pub t: f64,
+    pub u: f64,
+    pub v: f64,
     pub front_face: bool,
 }
 
@@ -45,6 +47,11 @@ impl HittableList {
     pub fn add(&mut self, object: Arc<dyn Hittable>) {
         self.bbox = Aabb::from_aabbs(&self.bbox, &object.bounding_box());
         self.objects.push(object);
+    }
+
+    pub fn append_list(&mut self, list: &HittableList) {
+        self.bbox = Aabb::from_aabbs(&self.bbox, &list.bbox);
+        self.objects.extend_from_slice(&list.objects);
     }
 
     pub fn clear(&mut self) {

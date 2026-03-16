@@ -19,10 +19,12 @@ pub struct Camera {
 
     pub look_from: DVec3,
     pub look_at: DVec3,
-    pub up: DVec3,
+    pub vup: DVec3,
 
     pub defocus_angle: f64,
     pub focus_dist: f64,
+
+    pub background: Color,
 
     image_height: usize,
     center: DVec3,
@@ -40,6 +42,7 @@ pub struct Camera {
 
 impl Camera {
     pub fn new(aspect_ratio: f64, image_width: usize, spp: usize, max_depth: usize) -> Self {
+        let background = Color::new(0.7, 0.8, 1.0);
         Self {
             aspect_ratio,
             image_width,
@@ -48,9 +51,10 @@ impl Camera {
             fov: 90.0,
             look_from: DVec3::new(0.0, 0.0, 5.0),
             look_at: DVec3::new(0.0, 0.0, 0.0),
-            up: DVec3::Y,
+            vup: DVec3::Y,
             defocus_angle: 0.0,
-            focus_dist: INFINITY,
+            focus_dist: 10.0,
+            background,
             image_height: 0,
             pixel_samples_scale: 1.0 / (spp as f64),
             center: DVec3::ZERO,
@@ -71,12 +75,12 @@ impl Camera {
         let mut image = PPMImage::new(self.image_width, self.image_height);
 
         for y in 0..image.height {
-            info!("Scanlines remaining: {}", image.height - y);
+            print!("\rScanlines remaining: {}", image.height - y);
             for x in 0..image.width {
                 let mut pixel_color = Color::new(0.0, 0.0, 0.0);
                 for _ in 0..self.spp {
                     let ray = self.get_ray(x, y);
-                    pixel_color = pixel_color + Self::ray_color(&ray, self.max_depth, world);
+                    pixel_color = pixel_color + self.ray_color(&ray, self.max_depth, world);
                 }
                 image.set_pixel(x, y, &(pixel_color * self.pixel_samples_scale));
             }
@@ -96,7 +100,7 @@ impl Camera {
         let viewport_width = viewport_height * (self.image_width as f64 / self.image_height as f64);
 
         self.w = (self.look_from - self.look_at).normalize();
-        self.u = self.up.cross(self.w).normalize();
+        self.u = self.vup.cross(self.w).normalize();
         self.v = self.w.cross(self.u);
 
         let viewport_u = viewport_width * self.u;
@@ -139,23 +143,26 @@ impl Camera {
         self.center + (p.x * self.defocus_disk_u) + (p.y * self.defocus_disk_v)
     }
 
-    fn ray_color(r: &Ray, depth: usize, world: &impl Hittable) -> Color {
+    fn ray_color(&self, r: &Ray, depth: usize, world: &impl Hittable) -> Color {
         if depth <= 0 {
             return Color::new(0.0, 0.0, 0.0);
         }
 
         if let Some(hit) = world.hit(r, &Interval::new(0.001, f64::INFINITY)) {
+            let emission = if let Some(ref material) = hit.material {
+                material.emitted(hit.u, hit.v, hit.point)
+            } else {
+                Color::new(0.0, 0.0, 0.0)
+            };
+
             if let Some(ref material) = hit.material {
                 if let Some((attenuation, scattered)) = material.scatter(r, &hit) {
-                    return attenuation * Self::ray_color(&scattered, depth - 1, world);
+                    return emission + attenuation * self.ray_color(&scattered, depth - 1, world);
                 }
             }
-            return Color::new(0.0, 0.0, 0.0);
+            return emission;
         }
 
-        let unit_dir = r.dir.normalize();
-        let a = 0.5 * (unit_dir.y + 1.0);
-        let color = (1.0 - a) * DVec3::ONE + a * DVec3::new(0.5, 0.7, 1.0);
-        Color::from_vec3(color)
+        self.background
     }
 }

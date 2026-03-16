@@ -11,11 +11,10 @@ use std::sync::Arc;
 use crate::{
     camera::Camera,
     image::Color,
-    material::{Material, dielectric::Dielectric, lambertian::Lambertian, metallic::Metallic},
+    material::{diffuse_light::DiffuseLight, lambertian::Lambertian},
     optim::bvh::BvhNode,
-    primitives::sphere::Sphere,
+    primitives::quad::Quad,
     ray::hittable::HittableList,
-    utils::{random_f64, random_f64_range, random_vec3, random_vec3_range},
 };
 use glam::DVec3;
 use log::info;
@@ -23,79 +22,72 @@ use log::info;
 fn main() {
     env_logger::init();
 
-    let aspect_ratio = 16.0 / 9.0;
-    let image_width = 1200;
+    let aspect_ratio = 1.0;
+    let image_width = 600;
 
-    let mut camera = Camera::new(aspect_ratio, image_width, 10, 50);
+    let mut camera = Camera::new(aspect_ratio, image_width, 50, 50);
 
-    camera.fov = 20.0;
-    camera.look_from = DVec3::new(13.0, 2.0, 3.0);
-    camera.look_at = DVec3::new(0.0, 0.0, 0.0);
+    camera.fov = 40.0;
+    camera.look_from = DVec3::new(278.0, 278.0, -800.0);
+    camera.look_at = DVec3::new(278.0, 278.0, 0.0);
+    camera.vup = DVec3::new(0.0, 1.0, 0.0);
 
-    camera.defocus_angle = 0.6;
-    camera.focus_dist = 10.0;
-
-    let ground_mat = Arc::new(Lambertian::new(Color::new(0.5, 0.5, 0.5)));
+    camera.defocus_angle = 0.0;
+    camera.background = Color::new(0.0, 0.0, 0.0);
 
     let mut world = HittableList::new();
 
-    world.add(Arc::new(Sphere::stationary(
-        DVec3::new(0.0, -1000.0, 0.0),
-        1000.0,
-        Some(ground_mat),
+    let red = Arc::new(Lambertian::new(Color::new(0.65, 0.05, 0.05)));
+    let white = Arc::new(Lambertian::new(Color::new(0.73, 0.73, 0.73)));
+    let green = Arc::new(Lambertian::new(Color::new(0.12, 0.45, 0.15)));
+    let light = Arc::new(DiffuseLight::new(Color::new(15.0, 15.0, 15.0)));
+
+    // Left wall (green)
+    world.add(Arc::new(Quad::new(
+        DVec3::new(555.0, 0.0, 0.0),
+        DVec3::new(0.0, 555.0, 0.0),
+        DVec3::new(0.0, 0.0, 555.0),
+        Some(green),
     )));
 
-    for a in -11..11 {
-        for b in -11..11 {
-            let choose_mat = random_f64();
-            let center = DVec3::new(
-                a as f64 + 0.9 * random_f64(),
-                0.2,
-                b as f64 + 0.9 * random_f64(),
-            );
-
-            if (center - DVec3::new(4.0, 0.2, 0.0)).length() > 0.9 {
-                let sphere_mat: Arc<dyn Material>;
-
-                if choose_mat < 0.8 {
-                    let albedo = Color::from_vec3(random_vec3() * random_vec3());
-                    sphere_mat = Arc::new(Lambertian::new(albedo));
-                    let center2 = center + DVec3::new(0.0, random_f64_range(0.0, 0.5), 0.0);
-                    world.add(Arc::new(Sphere::moving(
-                        center,
-                        center2,
-                        0.2,
-                        Some(sphere_mat),
-                    )));
-                } else if choose_mat < 0.95 {
-                    let albedo = Color::from_vec3(random_vec3_range(0.5, 1.0));
-                    let fuzz = random_f64_range(0.0, 0.5);
-                    sphere_mat = Arc::new(Metallic::new(albedo, fuzz));
-                    world.add(Arc::new(Sphere::stationary(center, 0.2, Some(sphere_mat))));
-                } else {
-                    sphere_mat = Arc::new(Dielectric::new(1.5));
-                    world.add(Arc::new(Sphere::stationary(center, 0.2, Some(sphere_mat))));
-                }
-            }
-        }
-    }
-
-    world.add(Arc::new(Sphere::stationary(
-        DVec3::new(0.0, 1.0, 0.0),
-        1.0,
-        Some(Arc::new(Dielectric::new(1.5))),
+    // Right wall (red)
+    world.add(Arc::new(Quad::new(
+        DVec3::new(0.0, 0.0, 0.0),
+        DVec3::new(0.0, 555.0, 0.0),
+        DVec3::new(0.0, 0.0, 555.0),
+        Some(red),
     )));
 
-    world.add(Arc::new(Sphere::stationary(
-        DVec3::new(-4.0, 1.0, 0.0),
-        1.0,
-        Some(Arc::new(Lambertian::new(Color::new(0.4, 0.2, 0.1)))),
+    // Ceiling light
+    world.add(Arc::new(Quad::new(
+        DVec3::new(343.0, 554.0, 332.0),
+        DVec3::new(-130.0, 0.0, 0.0),
+        DVec3::new(0.0, 0.0, -105.0),
+        Some(light),
     )));
 
-    world.add(Arc::new(Sphere::stationary(
-        DVec3::new(4.0, 1.0, 0.0),
-        1.0,
-        Some(Arc::new(Metallic::new(Color::new(1.0, 1.0, 1.0), 0.0))),
+    // Floor
+    world.add(Arc::new(Quad::new(
+        DVec3::new(0.0, 0.0, 0.0),
+        DVec3::new(555.0, 0.0, 0.0),
+        DVec3::new(0.0, 0.0, 555.0),
+        Some(white.clone()),
+    )));
+
+    // Ceiling
+    world.add(Arc::new(Quad::new(
+        DVec3::new(555.0, 555.0, 555.0),
+        DVec3::new(-555.0, 0.0, 0.0),
+        DVec3::new(0.0, 0.0, -555.0),
+        Some(white.clone()),
+    )));
+
+    // Back wall
+    world.add(Arc::new(Quad::new(
+        DVec3::new(0.0, 0.0, 555.0),
+        DVec3::new(555.0, 0.0, 0.0),
+        DVec3::new(0.0, 555.0, 0.0),
+        Some(white),
     )));
 
     let bvh_world = BvhNode::from_list(&world);
@@ -103,5 +95,5 @@ fn main() {
 
     let filename = format!("output.ppm");
     image.save(&filename).expect("Failed to save image");
-    info!("done");
+    println!("done");
 }

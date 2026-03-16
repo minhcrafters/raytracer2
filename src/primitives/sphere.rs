@@ -97,6 +97,8 @@ impl Hittable for Sphere {
             material: self.material.clone(),
             t: root,
             front_face: false,
+            u: 0.0,
+            v: 0.0,
         };
 
         rec.set_face_normal(r, normal);
