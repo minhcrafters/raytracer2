@@ -19,7 +19,9 @@ pub struct Sphere {
 }
 
 impl Sphere {
-    pub fn stationary(center: DVec3, radius: f64, material: Option<Arc<dyn Material>>) -> Self {
+    pub fn new() -> Self {
+        let center = DVec3::ZERO;
+        let radius = 1.0;
         let rvec = DVec3::new(radius, radius, radius);
         let bbox = Aabb::from_points(center - rvec, center + rvec);
         Self {
@@ -27,28 +29,7 @@ impl Sphere {
             center_vec: DVec3::ZERO,
             is_moving: false,
             radius,
-            material,
-            transform: Transform::default(),
-            bbox,
-        }
-    }
-
-    pub fn moving(
-        center1: DVec3,
-        center2: DVec3,
-        radius: f64,
-        material: Option<Arc<dyn Material>>,
-    ) -> Self {
-        let rvec = DVec3::new(radius, radius, radius);
-        let box1 = Aabb::from_points(center1 - rvec, center1 + rvec);
-        let box2 = Aabb::from_points(center2 - rvec, center2 + rvec);
-        let bbox = Aabb::from_aabbs(&box1, &box2);
-        Self {
-            center: center1,
-            center_vec: center2 - center1,
-            is_moving: true,
-            radius,
-            material,
+            material: None,
             transform: Transform::default(),
             bbox,
         }

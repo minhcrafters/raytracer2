@@ -20,7 +20,46 @@ pub struct Quad {
 }
 
 impl Quad {
-    pub fn new(q: DVec3, u: DVec3, v: DVec3, material: Option<Arc<dyn Material>>) -> Self {
+    pub fn new() -> Self {
+        let q = DVec3::new(-0.5, -0.5, 0.0);
+        let u = DVec3::new(1.0, 0.0, 0.0);
+        let v = DVec3::new(0.0, 1.0, 0.0);
+        let material = None;
+
+        let n = u.cross(v);
+        let normal = n.normalize();
+        let d = normal.dot(q);
+        let w = n / n.length_squared();
+
+        let bbox_diagonal1 = Aabb::from_points(q, q + u + v);
+        let bbox_diagonal2 = Aabb::from_points(q + u, q + v);
+        let mut bbox = Aabb::from_aabbs(&bbox_diagonal1, &bbox_diagonal2);
+
+        let delta = 0.0001;
+        if bbox.x.size() < delta {
+            bbox.x = Interval::new(bbox.x.min - delta / 2.0, bbox.x.max + delta / 2.0);
+        }
+        if bbox.y.size() < delta {
+            bbox.y = Interval::new(bbox.y.min - delta / 2.0, bbox.y.max + delta / 2.0);
+        }
+        if bbox.z.size() < delta {
+            bbox.z = Interval::new(bbox.z.min - delta / 2.0, bbox.z.max + delta / 2.0);
+        }
+
+        Self {
+            q,
+            u,
+            v,
+            material,
+            transform: Transform::default(),
+            bbox,
+            normal,
+            d,
+            w,
+        }
+    }
+
+    pub fn from_points(q: DVec3, u: DVec3, v: DVec3, material: Option<Arc<dyn Material>>) -> Self {
         let n = u.cross(v);
         let normal = n.normalize();
         let d = normal.dot(q);
@@ -61,12 +100,12 @@ impl Quad {
         let w = DVec3::new(0.0, 0.0, size);
 
         vec![
-            Quad::new(center - half_size * (u + v + w), u, v, material.clone()), // Front face
-            Quad::new(center - half_size * (u + v - w), u, -v, material.clone()), // Back face
-            Quad::new(center - half_size * (u - v + w), u, w, material.clone()), // Top face
-            Quad::new(center - half_size * (u - v - w), u, -w, material.clone()), // Bottom face
-            Quad::new(center - half_size * (-u + v + w), v, w, material.clone()), // Left face
-            Quad::new(center - half_size * (-u + v - w), v, -w, material.clone()), // Right face
+            Quad::from_points(center - half_size * (u + v + w), u, v, material.clone()), // Front face
+            Quad::from_points(center - half_size * (u + v - w), u, -v, material.clone()), // Back face
+            Quad::from_points(center - half_size * (u - v + w), u, w, material.clone()), // Top face
+            Quad::from_points(center - half_size * (u - v - w), u, -w, material.clone()), // Bottom face
+            Quad::from_points(center - half_size * (-u + v + w), v, w, material.clone()), // Left face
+            Quad::from_points(center - half_size * (-u + v - w), v, -w, material.clone()), // Right face
         ]
     }
 }

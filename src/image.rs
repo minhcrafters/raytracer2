@@ -15,6 +15,7 @@ pub struct Color {
     pub b: f64,
 }
 
+#[allow(dead_code)]
 impl Color {
     pub const BLACK: Color = Color {
         r: 0.0,
@@ -44,11 +45,22 @@ impl Color {
         Self { r, g, b }
     }
 
-    pub fn from_vec3(vec3: DVec3) -> Color {
-        Color {
+    pub fn from_vec3(vec3: DVec3) -> Self {
+        Self {
             r: vec3.x,
             g: vec3.y,
             b: vec3.z,
+        }
+    }
+
+    pub fn from_hex(hex: i32) -> Self {
+        let r = ((hex >> 16) & 0xFF) as u8;
+        let g = ((hex >> 8) & 0xFF) as u8;
+        let b = (hex & 0xFF) as u8;
+        Self {
+            r: r as f64 / 255.0,
+            g: g as f64 / 255.0,
+            b: b as f64 / 255.0,
         }
     }
 }
