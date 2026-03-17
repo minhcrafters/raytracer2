@@ -62,7 +62,7 @@ fn cornell_box() -> PPMImage {
     );
     world.add(Arc::new(back_wall));
 
-    let obj_mat = Arc::new(Metallic::new(Color::new(1.0, 1.0, 1.0), 0.1));
+    let obj_mat = Arc::new(Dielectric::new(Color::new(0.8, 0.9, 1.0), 1.5, 0.2));
     let transform = Transform::new()
         .scale(DVec3::splat(80.0))
         .translate(DVec3::new(278.0, 0.0, 278.0));

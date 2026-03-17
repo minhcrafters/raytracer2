@@ -145,7 +145,7 @@ impl TriBvhNode {
                         edge1.cross(edge2).normalize()
                     };
 
-                    let mut rec = HitRecord {
+                    let rec = HitRecord {
                         point: intersection_obj,
                         normal: normal_obj,
                         material: Some(mesh.material.clone()),

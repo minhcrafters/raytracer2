@@ -4,18 +4,20 @@ use crate::{
     image::Color,
     material::{Material, ScatterRecord},
     ray::Ray,
-    utils::random_f64,
+    utils::{random_f64, random_unit_vec3, random_vec3},
 };
 
 use crate::hittable::HitRecord;
 
 pub struct Dielectric {
+    pub albedo: Color,
     pub ior: f64,
+    pub fuzz: f64,
 }
 
 impl Dielectric {
-    pub fn new(ior: f64) -> Self {
-        Self { ior }
+    pub fn new(albedo: Color, ior: f64, fuzz: f64) -> Self {
+        Self { albedo, ior, fuzz }
     }
 }
 
@@ -36,15 +38,15 @@ impl Material for Dielectric {
         let direction: DVec3;
 
         if cannot_refract || Self::reflectance(cos_theta, ior) > random_f64() {
-            direction = unit_dir.reflect(hit_record.normal);
+            direction = unit_dir.reflect(hit_record.normal) + self.fuzz * random_unit_vec3();
         } else {
-            direction = unit_dir.refract(hit_record.normal, ior);
+            direction = unit_dir.refract(hit_record.normal, ior) + self.fuzz * random_unit_vec3();
         }
 
         let scattered_ray = Ray::new(hit_record.point, direction, ray_in.time);
 
         Some(ScatterRecord {
-            attenuation: Color::WHITE,
+            attenuation: self.albedo,
             pdf: None,
             skip_pdf: true,
             skip_pdf_ray: scattered_ray,
