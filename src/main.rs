@@ -36,7 +36,7 @@ fn cornell_box() -> PPMImage {
     camera.vup = DVec3::new(0.0, 1.0, 0.0);
 
     camera.defocus_angle = 0.0;
-    camera.background = Background::Hdri(Hdri::new("glasshouse_interior_4k.hdr"));
+    camera.background = Background::Hdri(Hdri::new("hdri/glasshouse_interior_4k.hdr"));
 
     let mut world = HittableList::new();
     let mut lights = HittableList::new();

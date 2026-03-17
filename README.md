@@ -1,2 +1,3 @@
 # raytracer2
-raytracer v2
+
+version 2 cause why not
