@@ -1,4 +1,3 @@
-pub mod instance;
 pub mod model;
 pub mod quad;
 pub mod sphere;
@@ -40,6 +39,9 @@ pub trait Hittable: Send + Sync {
     fn random(&self, _origin: glam::DVec3) -> glam::DVec3 {
         glam::DVec3::new(1.0, 0.0, 0.0)
     }
+    fn is_empty(&self) -> bool {
+        false
+    }
     fn hit(&self, r: &Ray, interval: &Interval) -> Option<HitRecord>;
     fn bounding_box(&self) -> Aabb;
 }
@@ -74,6 +76,10 @@ impl HittableList {
 }
 
 impl Hittable for HittableList {
+    fn is_empty(&self) -> bool {
+        self.objects.is_empty()
+    }
+
     fn hit(&self, r: &Ray, interval: &Interval) -> Option<HitRecord> {
         let mut hit_record = None;
         let mut closest_so_far = interval.max;

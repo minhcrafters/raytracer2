@@ -1,4 +1,7 @@
-use crate::{hittable::Hittable, utils::random_f64};
+use crate::{
+    hittable::Hittable,
+    utils::{random_cosine_direction, random_f64},
+};
 use glam::DVec3;
 
 pub trait Pdf {
@@ -29,7 +32,7 @@ impl Pdf for CosinePdf {
     }
 
     fn generate(&self) -> DVec3 {
-        self.uvw.local(crate::utils::random_cosine_direction())
+        self.uvw.local(random_cosine_direction())
     }
 }
 

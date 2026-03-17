@@ -4,7 +4,7 @@ use std::sync::Arc;
 use crate::{
     hittable::{HitRecord, Hittable},
     material::Material,
-    ray::{Ray, aabb::Aabb, interval::Interval},
+    ray::{Ray, aabb::Aabb, interval::Interval, transform::Transform},
 };
 
 pub struct Triangle {
@@ -12,6 +12,7 @@ pub struct Triangle {
     pub u: DVec3,
     pub v: DVec3,
     pub material: Option<Arc<dyn Material>>,
+    pub transform: Transform,
     bbox: Aabb,
     normal: DVec3,
     d: f64,
@@ -45,6 +46,7 @@ impl Triangle {
             u,
             v,
             material,
+            transform: Transform::default(),
             bbox,
             normal,
             d,
@@ -55,7 +57,13 @@ impl Triangle {
 
 impl Hittable for Triangle {
     fn hit(&self, r: &Ray, interval: &Interval) -> Option<HitRecord> {
-        let denom = self.normal.dot(r.dir);
+        let ray_obj = Ray::new(
+            self.transform.inverse_transform_point(r.origin),
+            self.transform.inverse_transform_vector(r.dir),
+            r.time,
+        );
+
+        let denom = self.normal.dot(ray_obj.dir);
 
         // No hit if the ray is parallel to the plane.
         if denom.abs() < 1e-8 {
@@ -63,14 +71,14 @@ impl Hittable for Triangle {
         }
 
         // Return false if the hit point parameter t is outside the ray interval.
-        let t = (self.d - self.normal.dot(r.origin)) / denom;
+        let t = (self.d - self.normal.dot(ray_obj.origin)) / denom;
         if !interval.contains(t) {
             return None;
         }
 
         // Determine the hit point lies within the planar shape using its principal 2D axes.
-        let intersection = r.at(t);
-        let planar_hitpt_vector = intersection - self.q;
+        let intersection_obj = ray_obj.at(t);
+        let planar_hitpt_vector = intersection_obj - self.q;
         let alpha = self.w.dot(planar_hitpt_vector.cross(self.v));
         let beta = self.w.dot(self.u.cross(planar_hitpt_vector));
 
@@ -79,9 +87,11 @@ impl Hittable for Triangle {
             return None;
         }
 
+        let normal_world = self.transform.transform_normal(self.normal);
+
         let mut rec = HitRecord {
-            point: intersection,
-            normal: self.normal,
+            point: self.transform.transform_point(intersection_obj),
+            normal: normal_world,
             material: self.material.clone(),
             t,
             u: alpha,
@@ -89,13 +99,13 @@ impl Hittable for Triangle {
             front_face: false,
         };
 
-        rec.set_face_normal(r, self.normal);
+        rec.set_face_normal(r, normal_world);
 
         Some(rec)
     }
 
     fn bounding_box(&self) -> Aabb {
-        self.bbox
+        self.bbox.transform(&self.transform)
     }
 
     fn pdf_value(&self, origin: DVec3, direction: DVec3) -> f64 {
@@ -104,7 +114,10 @@ impl Hittable for Triangle {
             let distance_squared = rec.t * rec.t * direction.length_squared();
             let cosine = (direction.dot(rec.normal) / direction.length()).abs();
 
-            let area = 0.5 * self.u.cross(self.v).length();
+            let world_u = self.transform.transform_vector(self.u);
+            let world_v = self.transform.transform_vector(self.v);
+            let area = 0.5 * world_u.cross(world_v).length();
+
             distance_squared / (cosine * area)
         } else {
             0.0
@@ -118,7 +131,8 @@ impl Hittable for Triangle {
             r1 = 1.0 - r1;
             r2 = 1.0 - r2;
         }
-        let p = self.q + (r1 * self.u) + (r2 * self.v);
-        p - origin
+        let p_obj = self.q + (r1 * self.u) + (r2 * self.v);
+        let p_world = self.transform.transform_point(p_obj);
+        p_world - origin
     }
 }

@@ -36,8 +36,8 @@ impl Hdri {
     pub fn sample(&self, dir: DVec3) -> Color {
         // Convert direction to spherical coordinates for equirectangular projection
         let dir = dir.normalize();
-        let phi = f64::atan2(dir.z, dir.x);
-        let theta = f64::asin(dir.y);
+        let phi = dir.z.atan2(dir.x);
+        let theta = dir.y.asin();
 
         // Map to UV coordinates
         let u = 1.0 - (phi + std::f64::consts::PI) / (2.0 * std::f64::consts::PI);

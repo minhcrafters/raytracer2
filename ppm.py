@@ -24,7 +24,7 @@ def main():
     filename = sys.argv[1]
     width, height, pixel_data = read_ppm(filename)
 
-    scale = 1
+    scale = 0.5
 
     pygame.init()
     screen = pygame.display.set_mode((width * scale, height * scale))

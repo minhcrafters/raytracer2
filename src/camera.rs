@@ -53,7 +53,7 @@ impl Camera {
             vup: DVec3::Y,
             defocus_angle: 0.0,
             focus_dist: 10.0,
-            background: Background::Color(Color::new(0.7, 0.8, 1.0)),
+            background: Background::Color(Color::new(0.5, 0.7, 1.0)),
             image_height: 0,
             pixel_samples_scale: 1.0 / (spp as f64),
             center: DVec3::ZERO,
@@ -205,12 +205,20 @@ impl Camera {
                                 * self.ray_color(&srec.skip_pdf_ray, depth - 1, world, lights);
                     }
 
-                    let light_ptr = HittablePdf::new(lights, hit.point);
                     let material_pdf = srec.pdf.unwrap();
-                    let p = MixturePdf::new(&light_ptr, material_pdf.as_ref());
 
-                    let scattered = Ray::new(hit.point, p.generate(), r.time);
-                    let pdf_val = p.value(scattered.dir);
+                    let scattered;
+                    let pdf_val;
+
+                    if lights.is_empty() {
+                        scattered = Ray::new(hit.point, material_pdf.generate(), r.time);
+                        pdf_val = material_pdf.value(scattered.dir);
+                    } else {
+                        let light_ptr = HittablePdf::new(lights, hit.point);
+                        let p = MixturePdf::new(&light_ptr, material_pdf.as_ref());
+                        scattered = Ray::new(hit.point, p.generate(), r.time);
+                        pdf_val = p.value(scattered.dir);
+                    }
 
                     let scattering_pdf = material.scattering_pdf(r, &hit, &scattered);
 
@@ -219,7 +227,7 @@ impl Camera {
                         * self.ray_color(&scattered, depth - 1, world, lights))
                         / pdf_val;
 
-                    // Avoid fireflies
+                    // Clamping to avoid fireflies, especially from HDRIs
                     let mut final_color = emission + scatter_color;
                     final_color.r = final_color.r.min(10.0);
                     final_color.g = final_color.g.min(10.0);

@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::Write;
 use std::ops::{Add, Div, Mul, Sub};
+use std::path::Path;
 
 use glam::DVec3;
 use image::{Rgb, RgbImage};
@@ -185,8 +186,8 @@ impl PPMImage {
         self.data[index + 2] = b;
     }
 
-    pub fn save(&self, filename: &str) -> std::io::Result<()> {
-        let mut file = File::create(filename)?;
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
+        let mut file = File::create(path)?;
         writeln!(file, "P6")?;
         writeln!(file, "{} {}", self.width, self.height)?;
         writeln!(file, "255")?;

@@ -1,6 +1,6 @@
 use glam::DVec3;
 
-use super::{Ray, interval::Interval};
+use super::{interval::Interval, transform::Transform, Ray};
 
 #[derive(Clone, Copy)]
 pub struct Aabb {
@@ -40,7 +40,7 @@ impl Aabb {
 
     pub fn hit(&self, r: &Ray, mut ray_t: Interval) -> bool {
         for a in 0..3 {
-            let inv_d = 1.0 / r.dir[a];
+            let inv_d = r.inv_dir[a];
             let orig = r.origin[a];
 
             let mut t0 = (self.axis(a).min - orig) * inv_d;
@@ -62,6 +62,31 @@ impl Aabb {
             }
         }
         true
+    }
+
+    pub fn transform(&self, transform: &Transform) -> Self {
+        let mut min = DVec3::new(f64::INFINITY, f64::INFINITY, f64::INFINITY);
+        let mut max = DVec3::new(f64::NEG_INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY);
+
+        for i in 0..2 {
+            for j in 0..2 {
+                for k in 0..2 {
+                    let x = if i == 0 { self.x.min } else { self.x.max };
+                    let y = if j == 0 { self.y.min } else { self.y.max };
+                    let z = if k == 0 { self.z.min } else { self.z.max };
+
+                    let tester = DVec3::new(x, y, z);
+                    let transformed = transform.transform_point(tester);
+
+                    for c in 0..3 {
+                        min[c] = f64::min(min[c], transformed[c]);
+                        max[c] = f64::max(max[c], transformed[c]);
+                    }
+                }
+            }
+        }
+
+        Self::from_points(min, max)
     }
 }
 

@@ -8,12 +8,12 @@ mod pdf;
 mod ray;
 mod utils;
 
-use std::{f64::consts::PI, sync::Arc};
+use std::sync::Arc;
 
 use crate::{
-    background::Background,
+    background::{Background, hdri::Hdri},
     camera::Camera,
-    hittable::{HittableList, instance::Instance, model::load_model, quad::Quad},
+    hittable::{HittableList, model::TriMesh, quad::Quad},
     image::{Color, PPMImage},
     material::{
         dielectric::Dielectric, diffuse_light::DiffuseLight, lambertian::Lambertian,
@@ -22,11 +22,11 @@ use crate::{
     optim::bvh::BvhNode,
     ray::transform::Transform,
 };
-use glam::{DQuat, DVec3};
+use glam::DVec3;
 
 fn cornell_box() -> PPMImage {
     let aspect_ratio = 1.0;
-    let image_width = 600;
+    let image_width = 1200;
 
     let mut camera = Camera::new(aspect_ratio, image_width, 500, 50);
 
@@ -36,7 +36,7 @@ fn cornell_box() -> PPMImage {
     camera.vup = DVec3::new(0.0, 1.0, 0.0);
 
     camera.defocus_angle = 0.0;
-    camera.background = Background::Color(Color::new(0.0, 0.0, 0.0));
+    camera.background = Background::Hdri(Hdri::new("glasshouse_interior_4k.hdr"));
 
     let mut world = HittableList::new();
     let mut lights = HittableList::new();
@@ -46,67 +46,32 @@ fn cornell_box() -> PPMImage {
     let green = Arc::new(Lambertian::new(Color::new(0.12, 0.45, 0.15)));
     let light_mat = Arc::new(DiffuseLight::new(Color::new(15.0, 15.0, 15.0)));
 
-    // Left wall (green)
-    world.add(Arc::new(Quad::new(
-        DVec3::new(555.0, 0.0, 0.0),
-        DVec3::new(0.0, 555.0, 0.0),
-        DVec3::new(0.0, 0.0, 555.0),
-        Some(green),
-    )));
-
-    // Right wall (red)
-    world.add(Arc::new(Quad::new(
-        DVec3::new(0.0, 0.0, 0.0),
-        DVec3::new(0.0, 555.0, 0.0),
-        DVec3::new(0.0, 0.0, 555.0),
-        Some(red),
-    )));
-
-    // Ceiling light
-    let ceiling_light = Arc::new(Quad::new(
-        DVec3::new(343.0, 554.0, 332.0),
-        DVec3::new(-130.0, 0.0, 0.0),
-        DVec3::new(0.0, 0.0, -105.0),
-        Some(light_mat),
-    ));
-    world.add(ceiling_light.clone());
-    lights.add(ceiling_light);
-
-    // Floor
-    world.add(Arc::new(Quad::new(
+    let floor = Quad::new(
         DVec3::new(0.0, 0.0, 0.0),
         DVec3::new(555.0, 0.0, 0.0),
         DVec3::new(0.0, 0.0, 555.0),
         Some(white.clone()),
-    )));
+    );
+    world.add(Arc::new(floor));
 
-    // Ceiling
-    world.add(Arc::new(Quad::new(
-        DVec3::new(555.0, 555.0, 555.0),
-        DVec3::new(-555.0, 0.0, 0.0),
-        DVec3::new(0.0, 0.0, -555.0),
-        Some(white.clone()),
-    )));
-
-    // Back wall
-    world.add(Arc::new(Quad::new(
+    let back_wall = Quad::new(
         DVec3::new(0.0, 0.0, 555.0),
         DVec3::new(555.0, 0.0, 0.0),
         DVec3::new(0.0, 555.0, 0.0),
         Some(white),
-    )));
+    );
+    world.add(Arc::new(back_wall));
 
-    // N64 logo
-    let logo_mat = Arc::new(Dielectric::new(1.5));
-    if let Ok(logo_mesh) = load_model("obj/n64_logo.obj", logo_mat) {
-        let transform = Transform::new()
-            .scale(DVec3::splat(250.0))
-            .rotate(DQuat::from_rotation_y(PI / 6.0))
-            .translate(DVec3::new(278.0, 150.0, 278.0));
-        world.add(Arc::new(Instance::new(
-            Arc::new(BvhNode::from_list(&logo_mesh)),
-            transform,
-        )));
+    let obj_mat = Arc::new(Metallic::new(Color::new(1.0, 1.0, 1.0), 0.1));
+    let transform = Transform::new()
+        .scale(DVec3::splat(80.0))
+        .translate(DVec3::new(278.0, 0.0, 278.0));
+
+    if let Ok(meshes) = TriMesh::load_model("obj/teapot.obj", obj_mat, true) {
+        for mut mesh in meshes {
+            mesh.transform = transform;
+            world.add(Arc::new(mesh));
+        }
     }
 
     let bvh_world = BvhNode::from_list(&world);

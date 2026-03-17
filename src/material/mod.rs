@@ -13,7 +13,6 @@ pub struct ScatterRecord<'a> {
 }
 
 pub trait Material: Send + Sync {
-    /// Scatters an incident ray against the material.
     fn scatter<'a>(&self, _ray_in: &Ray, _hit_record: &HitRecord) -> Option<ScatterRecord<'a>> {
         None
     }

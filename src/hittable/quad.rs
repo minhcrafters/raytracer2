@@ -4,7 +4,7 @@ use std::sync::Arc;
 use crate::{
     hittable::{HitRecord, Hittable},
     material::Material,
-    ray::{Ray, aabb::Aabb, interval::Interval},
+    ray::{Ray, aabb::Aabb, interval::Interval, transform::Transform},
 };
 
 pub struct Quad {
@@ -12,6 +12,7 @@ pub struct Quad {
     pub u: DVec3,
     pub v: DVec3,
     pub material: Option<Arc<dyn Material>>,
+    pub transform: Transform,
     bbox: Aabb,
     normal: DVec3,
     d: f64,
@@ -45,6 +46,7 @@ impl Quad {
             u,
             v,
             material,
+            transform: Transform::default(),
             bbox,
             normal,
             d,
@@ -71,7 +73,13 @@ impl Quad {
 
 impl Hittable for Quad {
     fn hit(&self, r: &Ray, interval: &Interval) -> Option<HitRecord> {
-        let denom = self.normal.dot(r.dir);
+        let ray_obj = Ray::new(
+            self.transform.inverse_transform_point(r.origin),
+            self.transform.inverse_transform_vector(r.dir),
+            r.time,
+        );
+
+        let denom = self.normal.dot(ray_obj.dir);
 
         // No hit if the ray is parallel to the plane.
         if denom.abs() < 1e-8 {
@@ -79,14 +87,14 @@ impl Hittable for Quad {
         }
 
         // Return false if the hit point parameter t is outside the ray interval.
-        let t = (self.d - self.normal.dot(r.origin)) / denom;
+        let t = (self.d - self.normal.dot(ray_obj.origin)) / denom;
         if !interval.contains(t) {
             return None;
         }
 
         // Determine the hit point lies within the planar shape using its principal 2D axes.
-        let intersection = r.at(t);
-        let planar_hitpt_vector = intersection - self.q;
+        let intersection_obj = ray_obj.at(t);
+        let planar_hitpt_vector = intersection_obj - self.q;
         let alpha = self.w.dot(planar_hitpt_vector.cross(self.v));
         let beta = self.w.dot(self.u.cross(planar_hitpt_vector));
 
@@ -94,9 +102,11 @@ impl Hittable for Quad {
             return None;
         }
 
+        let normal_world = self.transform.transform_normal(self.normal);
+
         let mut rec = HitRecord {
-            point: intersection,
-            normal: self.normal,
+            point: self.transform.transform_point(intersection_obj),
+            normal: normal_world,
             material: self.material.clone(),
             t,
             u: alpha,
@@ -104,13 +114,13 @@ impl Hittable for Quad {
             front_face: false,
         };
 
-        rec.set_face_normal(r, self.normal);
+        rec.set_face_normal(r, normal_world);
 
         Some(rec)
     }
 
     fn bounding_box(&self) -> Aabb {
-        self.bbox
+        self.bbox.transform(&self.transform)
     }
 
     fn pdf_value(&self, origin: DVec3, direction: DVec3) -> f64 {
@@ -119,7 +129,10 @@ impl Hittable for Quad {
             let distance_squared = rec.t * rec.t * direction.length_squared();
             let cosine = (direction.dot(rec.normal) / direction.length()).abs();
 
-            let area = self.u.cross(self.v).length();
+            let world_u = self.transform.transform_vector(self.u);
+            let world_v = self.transform.transform_vector(self.v);
+            let area = world_u.cross(world_v).length();
+
             distance_squared / (cosine * area)
         } else {
             0.0
@@ -127,8 +140,9 @@ impl Hittable for Quad {
     }
 
     fn random(&self, origin: DVec3) -> DVec3 {
-        let p =
+        let p_obj =
             self.q + (crate::utils::random_f64() * self.u) + (crate::utils::random_f64() * self.v);
-        p - origin
+        let p_world = self.transform.transform_point(p_obj);
+        p_world - origin
     }
 }
