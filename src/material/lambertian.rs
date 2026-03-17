@@ -1,10 +1,11 @@
 use crate::{
     hittable::HitRecord,
     image::Color,
-    material::Material,
+    material::{Material, ScatterRecord},
+    pdf::CosinePdf,
     ray::Ray,
-    utils::{near_zero, random_unit_vec3},
 };
+use std::f64::consts::PI;
 
 pub struct Lambertian {
     pub albedo: Color,
@@ -17,14 +18,17 @@ impl Lambertian {
 }
 
 impl Material for Lambertian {
-    fn scatter(&self, ray_in: &Ray, hit_record: &HitRecord) -> Option<(Color, Ray)> {
-        let mut scatter_direction = hit_record.normal + random_unit_vec3();
+    fn scatter<'a>(&self, _ray_in: &Ray, hit_record: &HitRecord) -> Option<ScatterRecord<'a>> {
+        Some(ScatterRecord {
+            attenuation: self.albedo,
+            pdf: Some(Box::new(CosinePdf::new(hit_record.normal))),
+            skip_pdf: false,
+            skip_pdf_ray: Ray::new(hit_record.point, hit_record.normal, 0.0),
+        })
+    }
 
-        if near_zero(scatter_direction) {
-            scatter_direction = hit_record.normal;
-        }
-
-        let scattered_ray = Ray::new(hit_record.point, scatter_direction, ray_in.time);
-        Some((self.albedo, scattered_ray))
+    fn scattering_pdf(&self, _ray_in: &Ray, hit_record: &HitRecord, scattered: &Ray) -> f64 {
+        let cosine = hit_record.normal.dot(scattered.dir.normalize());
+        if cosine < 0.0 { 0.0 } else { cosine / PI }
     }
 }

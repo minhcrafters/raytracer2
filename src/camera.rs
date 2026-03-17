@@ -1,9 +1,10 @@
 use glam::{DMat4, DVec3};
 
 use crate::{
-    hdri::Background,
+    background::Background,
     hittable::Hittable,
     image::{Color, PPMImage},
+    pdf::{HittablePdf, MixturePdf, Pdf},
     ray::{Ray, interval::Interval},
     utils::{random_f64, random_in_unit_disk},
 };
@@ -67,7 +68,7 @@ impl Camera {
         }
     }
 
-    pub fn render(&mut self, world: &impl Hittable) -> PPMImage {
+    pub fn render(&mut self, world: &impl Hittable, lights: &impl Hittable) -> PPMImage {
         self.init();
 
         let mut image = PPMImage::new(self.image_width, self.image_height);
@@ -87,7 +88,8 @@ impl Camera {
                         let mut pixel_color = Color::new(0.0, 0.0, 0.0);
                         for _ in 0..this.spp {
                             let ray = this.get_ray(x, y);
-                            pixel_color = pixel_color + this.ray_color(&ray, this.max_depth, world);
+                            pixel_color =
+                                pixel_color + this.ray_color(&ray, this.max_depth, world, lights);
                         }
                         (x, y, pixel_color * this.pixel_samples_scale)
                     })
@@ -177,21 +179,62 @@ impl Camera {
         self.center + (p.x * self.defocus_disk_u) + (p.y * self.defocus_disk_v)
     }
 
-    fn ray_color(&self, r: &Ray, depth: usize, world: &impl Hittable) -> Color {
+    fn ray_color(
+        &self,
+        r: &Ray,
+        depth: usize,
+        world: &impl Hittable,
+        lights: &impl Hittable,
+    ) -> Color {
         if depth <= 0 {
             return Color::new(0.0, 0.0, 0.0);
         }
 
         if let Some(hit) = world.hit(r, &Interval::new(0.001, f64::INFINITY)) {
             let emission = if let Some(ref material) = hit.material {
-                material.emitted(hit.u, hit.v, hit.point)
+                material.emitted(r, &hit)
             } else {
                 Color::new(0.0, 0.0, 0.0)
             };
 
             if let Some(ref material) = hit.material {
-                if let Some((attenuation, scattered)) = material.scatter(r, &hit) {
-                    return emission + attenuation * self.ray_color(&scattered, depth - 1, world);
+                if let Some(srec) = material.scatter(r, &hit) {
+                    if srec.skip_pdf {
+                        return emission
+                            + srec.attenuation
+                                * self.ray_color(&srec.skip_pdf_ray, depth - 1, world, lights);
+                    }
+
+                    let light_ptr = HittablePdf::new(lights, hit.point);
+                    let material_pdf = srec.pdf.unwrap();
+                    let p = MixturePdf::new(&light_ptr, material_pdf.as_ref());
+
+                    let scattered = Ray::new(hit.point, p.generate(), r.time);
+                    let pdf_val = p.value(scattered.dir);
+
+                    let scattering_pdf = material.scattering_pdf(r, &hit, &scattered);
+
+                    let scatter_color = (srec.attenuation
+                        * scattering_pdf
+                        * self.ray_color(&scattered, depth - 1, world, lights))
+                        / pdf_val;
+
+                    // Avoid fireflies
+                    let mut final_color = emission + scatter_color;
+                    final_color.r = final_color.r.min(10.0);
+                    final_color.g = final_color.g.min(10.0);
+                    final_color.b = final_color.b.min(10.0);
+                    if final_color.r.is_nan() {
+                        final_color.r = 0.0;
+                    }
+                    if final_color.g.is_nan() {
+                        final_color.g = 0.0;
+                    }
+                    if final_color.b.is_nan() {
+                        final_color.b = 0.0;
+                    }
+
+                    return final_color;
                 }
             }
             return emission;

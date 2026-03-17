@@ -105,4 +105,29 @@ impl Hittable for Sphere {
     fn bounding_box(&self) -> Aabb {
         self.bbox
     }
+
+    fn pdf_value(&self, origin: DVec3, direction: DVec3) -> f64 {
+        let ray = Ray::new(origin, direction, 0.0);
+        if self
+            .hit(&ray, &Interval::new(0.001, f64::INFINITY))
+            .is_some()
+        {
+            let cos_theta_max = (1.0
+                - self.radius * self.radius / (self.center - origin).length_squared())
+            .max(0.0)
+            .sqrt();
+            let solid_angle = 2.0 * std::f64::consts::PI * (1.0 - cos_theta_max);
+            1.0 / solid_angle
+        } else {
+            0.0
+        }
+    }
+
+    fn random(&self, origin: DVec3) -> DVec3 {
+        let direction = self.center - origin;
+        let distance_squared = direction.length_squared();
+        let uvw = crate::utils::OrthonormalBasis::build_from_w(direction);
+        let random_to_sphere = crate::utils::random_to_sphere(self.radius, distance_squared);
+        uvw.local(random_to_sphere)
+    }
 }

@@ -33,6 +33,13 @@ impl HitRecord {
 }
 
 pub trait Hittable: Send + Sync {
+    fn pdf_value(&self, _origin: glam::DVec3, _direction: glam::DVec3) -> f64 {
+        0.0
+    }
+
+    fn random(&self, _origin: glam::DVec3) -> glam::DVec3 {
+        glam::DVec3::new(1.0, 0.0, 0.0)
+    }
     fn hit(&self, r: &Ray, interval: &Interval) -> Option<HitRecord>;
     fn bounding_box(&self) -> Aabb;
 }
@@ -82,5 +89,27 @@ impl Hittable for HittableList {
 
     fn bounding_box(&self) -> Aabb {
         self.bbox
+    }
+
+    fn pdf_value(&self, origin: glam::DVec3, direction: glam::DVec3) -> f64 {
+        if self.objects.is_empty() {
+            return 0.0;
+        }
+        let weight = 1.0 / self.objects.len() as f64;
+        let mut sum = 0.0;
+        for object in &self.objects {
+            sum += weight * object.pdf_value(origin, direction);
+        }
+        sum
+    }
+
+    fn random(&self, origin: glam::DVec3) -> glam::DVec3 {
+        if self.objects.is_empty() {
+            return glam::DVec3::new(1.0, 0.0, 0.0);
+        }
+        let int_size = self.objects.len();
+        let rand_idx = (crate::utils::random_f64() * int_size as f64).floor() as usize;
+        let rand_idx = rand_idx.clamp(0, int_size.saturating_sub(1));
+        self.objects[rand_idx].random(origin)
     }
 }

@@ -1,17 +1,18 @@
+mod background;
 mod camera;
-pub mod hdri;
 mod hittable;
 mod image;
 mod material;
 mod optim;
+mod pdf;
 mod ray;
 mod utils;
 
 use std::{f64::consts::PI, sync::Arc};
 
 use crate::{
+    background::Background,
     camera::Camera,
-    hdri::Hdri,
     hittable::{HittableList, instance::Instance, model::load_model, quad::Quad},
     image::{Color, PPMImage},
     material::{
@@ -27,7 +28,7 @@ fn cornell_box() -> PPMImage {
     let aspect_ratio = 1.0;
     let image_width = 600;
 
-    let mut camera = Camera::new(aspect_ratio, image_width, 1000, 50);
+    let mut camera = Camera::new(aspect_ratio, image_width, 500, 50);
 
     camera.fov = 40.0;
     camera.look_from = DVec3::new(278.0, 278.0, -800.0);
@@ -35,38 +36,41 @@ fn cornell_box() -> PPMImage {
     camera.vup = DVec3::new(0.0, 1.0, 0.0);
 
     camera.defocus_angle = 0.0;
-    camera.background = hdri::Background::Hdri(Hdri::new("golden_gate_hills_2k.hdr"));
+    camera.background = Background::Color(Color::new(0.0, 0.0, 0.0));
 
     let mut world = HittableList::new();
+    let mut lights = HittableList::new();
 
     let red = Arc::new(Lambertian::new(Color::new(0.65, 0.05, 0.05)));
     let white = Arc::new(Lambertian::new(Color::new(0.73, 0.73, 0.73)));
     let green = Arc::new(Lambertian::new(Color::new(0.12, 0.45, 0.15)));
-    let light = Arc::new(DiffuseLight::new(Color::new(15.0, 15.0, 15.0)));
+    let light_mat = Arc::new(DiffuseLight::new(Color::new(15.0, 15.0, 15.0)));
 
     // Left wall (green)
-    // world.add(Arc::new(Quad::new(
-    //     DVec3::new(555.0, 0.0, 0.0),
-    //     DVec3::new(0.0, 555.0, 0.0),
-    //     DVec3::new(0.0, 0.0, 555.0),
-    //     Some(green),
-    // )));
+    world.add(Arc::new(Quad::new(
+        DVec3::new(555.0, 0.0, 0.0),
+        DVec3::new(0.0, 555.0, 0.0),
+        DVec3::new(0.0, 0.0, 555.0),
+        Some(green),
+    )));
 
     // Right wall (red)
-    // world.add(Arc::new(Quad::new(
-    //     DVec3::new(0.0, 0.0, 0.0),
-    //     DVec3::new(0.0, 555.0, 0.0),
-    //     DVec3::new(0.0, 0.0, 555.0),
-    //     Some(red),
-    // )));
+    world.add(Arc::new(Quad::new(
+        DVec3::new(0.0, 0.0, 0.0),
+        DVec3::new(0.0, 555.0, 0.0),
+        DVec3::new(0.0, 0.0, 555.0),
+        Some(red),
+    )));
 
     // Ceiling light
-    // world.add(Arc::new(Quad::new(
-    //     DVec3::new(343.0, 554.0, 332.0),
-    //     DVec3::new(-130.0, 0.0, 0.0),
-    //     DVec3::new(0.0, 0.0, -105.0),
-    //     Some(light),
-    // )));
+    let ceiling_light = Arc::new(Quad::new(
+        DVec3::new(343.0, 554.0, 332.0),
+        DVec3::new(-130.0, 0.0, 0.0),
+        DVec3::new(0.0, 0.0, -105.0),
+        Some(light_mat),
+    ));
+    world.add(ceiling_light.clone());
+    lights.add(ceiling_light);
 
     // Floor
     world.add(Arc::new(Quad::new(
@@ -77,28 +81,28 @@ fn cornell_box() -> PPMImage {
     )));
 
     // Ceiling
-    // world.add(Arc::new(Quad::new(
-    //     DVec3::new(555.0, 555.0, 555.0),
-    //     DVec3::new(-555.0, 0.0, 0.0),
-    //     DVec3::new(0.0, 0.0, -555.0),
-    //     Some(white.clone()),
-    // )));
+    world.add(Arc::new(Quad::new(
+        DVec3::new(555.0, 555.0, 555.0),
+        DVec3::new(-555.0, 0.0, 0.0),
+        DVec3::new(0.0, 0.0, -555.0),
+        Some(white.clone()),
+    )));
 
     // Back wall
-    // world.add(Arc::new(Quad::new(
-    //     DVec3::new(0.0, 0.0, 555.0),
-    //     DVec3::new(555.0, 0.0, 0.0),
-    //     DVec3::new(0.0, 555.0, 0.0),
-    //     Some(white),
-    // )));
+    world.add(Arc::new(Quad::new(
+        DVec3::new(0.0, 0.0, 555.0),
+        DVec3::new(555.0, 0.0, 0.0),
+        DVec3::new(0.0, 555.0, 0.0),
+        Some(white),
+    )));
 
     // N64 logo
-    let logo_mat = Arc::new(Metallic::new(Color::new(0.8, 0.8, 0.8), 0.01));
+    let logo_mat = Arc::new(Dielectric::new(1.5));
     if let Ok(logo_mesh) = load_model("obj/n64_logo.obj", logo_mat) {
         let transform = Transform::new()
             .scale(DVec3::splat(250.0))
             .rotate(DQuat::from_rotation_y(PI / 6.0))
-            .translate(DVec3::new(278.0, 0.0, 278.0));
+            .translate(DVec3::new(278.0, 150.0, 278.0));
         world.add(Arc::new(Instance::new(
             Arc::new(BvhNode::from_list(&logo_mesh)),
             transform,
@@ -106,7 +110,7 @@ fn cornell_box() -> PPMImage {
     }
 
     let bvh_world = BvhNode::from_list(&world);
-    camera.render(&bvh_world)
+    camera.render(&bvh_world, &lights)
 }
 
 fn main() {

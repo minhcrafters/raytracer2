@@ -1,6 +1,11 @@
 use glam::DVec3;
 
-use crate::{image::Color, material::Material, ray::Ray, utils::random_f64};
+use crate::{
+    image::Color,
+    material::{Material, ScatterRecord},
+    ray::Ray,
+    utils::random_f64,
+};
 
 use crate::hittable::HitRecord;
 
@@ -15,7 +20,7 @@ impl Dielectric {
 }
 
 impl Material for Dielectric {
-    fn scatter(&self, ray_in: &Ray, hit_record: &HitRecord) -> Option<(Color, Ray)> {
+    fn scatter<'a>(&self, ray_in: &Ray, hit_record: &HitRecord) -> Option<ScatterRecord<'a>> {
         let ior = if hit_record.front_face {
             1.0 / self.ior
         } else {
@@ -38,7 +43,12 @@ impl Material for Dielectric {
 
         let scattered_ray = Ray::new(hit_record.point, direction, ray_in.time);
 
-        Some((Color::WHITE, scattered_ray))
+        Some(ScatterRecord {
+            attenuation: Color::WHITE,
+            pdf: None,
+            skip_pdf: true,
+            skip_pdf_ray: scattered_ray,
+        })
     }
 }
 

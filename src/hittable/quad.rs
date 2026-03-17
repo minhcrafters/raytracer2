@@ -51,6 +51,22 @@ impl Quad {
             w,
         }
     }
+
+    pub fn cube(center: DVec3, size: f64, material: Option<Arc<dyn Material>>) -> Vec<Self> {
+        let half_size = size / 2.0;
+        let u = DVec3::new(size, 0.0, 0.0);
+        let v = DVec3::new(0.0, size, 0.0);
+        let w = DVec3::new(0.0, 0.0, size);
+
+        vec![
+            Quad::new(center - half_size * (u + v + w), u, v, material.clone()), // Front face
+            Quad::new(center - half_size * (u + v - w), u, -v, material.clone()), // Back face
+            Quad::new(center - half_size * (u - v + w), u, w, material.clone()), // Top face
+            Quad::new(center - half_size * (u - v - w), u, -w, material.clone()), // Bottom face
+            Quad::new(center - half_size * (-u + v + w), v, w, material.clone()), // Left face
+            Quad::new(center - half_size * (-u + v - w), v, -w, material.clone()), // Right face
+        ]
+    }
 }
 
 impl Hittable for Quad {
@@ -95,5 +111,24 @@ impl Hittable for Quad {
 
     fn bounding_box(&self) -> Aabb {
         self.bbox
+    }
+
+    fn pdf_value(&self, origin: DVec3, direction: DVec3) -> f64 {
+        let ray = Ray::new(origin, direction, 0.0);
+        if let Some(rec) = self.hit(&ray, &Interval::new(0.001, f64::INFINITY)) {
+            let distance_squared = rec.t * rec.t * direction.length_squared();
+            let cosine = (direction.dot(rec.normal) / direction.length()).abs();
+
+            let area = self.u.cross(self.v).length();
+            distance_squared / (cosine * area)
+        } else {
+            0.0
+        }
+    }
+
+    fn random(&self, origin: DVec3) -> DVec3 {
+        let p =
+            self.q + (crate::utils::random_f64() * self.u) + (crate::utils::random_f64() * self.v);
+        p - origin
     }
 }

@@ -97,4 +97,28 @@ impl Hittable for Triangle {
     fn bounding_box(&self) -> Aabb {
         self.bbox
     }
+
+    fn pdf_value(&self, origin: DVec3, direction: DVec3) -> f64 {
+        let ray = Ray::new(origin, direction, 0.0);
+        if let Some(rec) = self.hit(&ray, &Interval::new(0.001, f64::INFINITY)) {
+            let distance_squared = rec.t * rec.t * direction.length_squared();
+            let cosine = (direction.dot(rec.normal) / direction.length()).abs();
+
+            let area = 0.5 * self.u.cross(self.v).length();
+            distance_squared / (cosine * area)
+        } else {
+            0.0
+        }
+    }
+
+    fn random(&self, origin: DVec3) -> DVec3 {
+        let mut r1 = crate::utils::random_f64();
+        let mut r2 = crate::utils::random_f64();
+        if r1 + r2 > 1.0 {
+            r1 = 1.0 - r1;
+            r2 = 1.0 - r2;
+        }
+        let p = self.q + (r1 * self.u) + (r2 * self.v);
+        p - origin
+    }
 }

@@ -53,17 +53,3 @@ impl Hdri {
         self.pixels[j * self.width + i]
     }
 }
-
-pub enum Background {
-    Color(Color),
-    Hdri(Hdri),
-}
-
-impl Background {
-    pub fn sample(&self, dir: DVec3) -> Color {
-        match self {
-            Background::Color(c) => *c,
-            Background::Hdri(h) => h.sample(dir),
-        }
-    }
-}

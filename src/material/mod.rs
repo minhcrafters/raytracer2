@@ -5,13 +5,24 @@ pub mod metallic;
 
 use crate::{hittable::HitRecord, image::Color, ray::Ray};
 
+pub struct ScatterRecord<'a> {
+    pub attenuation: Color,
+    pub pdf: Option<Box<dyn crate::pdf::Pdf + 'a>>,
+    pub skip_pdf: bool,
+    pub skip_pdf_ray: Ray,
+}
+
 pub trait Material: Send + Sync {
     /// Scatters an incident ray against the material.
-    /// Returns `Some((attenuation, scattered_ray))` if the ray is scattered,
-    /// or `None` if the ray is absorbed.
-    fn scatter(&self, ray_in: &Ray, hit_record: &HitRecord) -> Option<(Color, Ray)>;
+    fn scatter<'a>(&self, _ray_in: &Ray, _hit_record: &HitRecord) -> Option<ScatterRecord<'a>> {
+        None
+    }
 
-    fn emitted(&self, _u: f64, _v: f64, _p: glam::DVec3) -> Color {
+    fn scattering_pdf(&self, _ray_in: &Ray, _hit_record: &HitRecord, _scattered: &Ray) -> f64 {
+        0.0
+    }
+
+    fn emitted(&self, _ray_in: &Ray, _hit_record: &HitRecord) -> Color {
         Color::new(0.0, 0.0, 0.0)
     }
 }
