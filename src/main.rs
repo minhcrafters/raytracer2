@@ -1,5 +1,6 @@
 pub mod background;
 pub mod camera;
+pub mod gpu;
 pub mod hittable;
 pub mod image;
 pub mod material;
@@ -32,8 +33,9 @@ use glam::{DQuat, DVec3};
 fn cornell_box() -> PPMImage {
     let aspect_ratio = 1.0;
     let image_width = 1024;
+    let spp = 1000;
 
-    let mut camera = Camera::new(aspect_ratio, image_width, 500, 10);
+    let mut camera = Camera::new(aspect_ratio, image_width, spp, 50);
 
     camera.fov = 0.686 * 180.0 / std::f64::consts::PI;
     camera.look_from = DVec3::new(278.0, 273.0, -800.0);
@@ -127,17 +129,6 @@ fn cornell_box() -> PPMImage {
         .translate(DVec3::new(368.0, 165.0, 351.0));
     world.add(Arc::new(large_box));
 
-    // let mut small_box = Cuboid::new(
-    //     DVec3::splat(-0.5),
-    //     DVec3::splat(0.5),
-    //     Some(box2_mat.clone()),
-    // );
-    // small_box.transform = Transform::new()
-    //     .scale(DVec3::new(165.0, 165.0, 165.0))
-    //     .rotate(DQuat::from_rotation_y(PI * 2.0 * (-197.0 / 360.0)))
-    //     .translate(DVec3::new(185.0, 82.5, 169.0));
-    // world.add(Arc::new(small_box));
-
     if let Ok(meshes) = TriMesh::load_model("obj/n64_logo.obj", box2_mat.clone(), false) {
         for mut mesh in meshes {
             mesh.transform = Transform::new()
@@ -149,15 +140,18 @@ fn cornell_box() -> PPMImage {
     }
 
     let bvh_world = BvhNode::from_list(&world);
-    camera.render(&bvh_world, &lights)
+
+    // GPU rendering
+    render_gpu(&mut camera, &world, &lights, &bvh_world, spp as u32)
 }
 
 #[allow(dead_code)]
 fn teapot_hdri() -> PPMImage {
     let aspect_ratio = 1.0;
     let image_width = 1200;
+    let spp = 500;
 
-    let mut camera = Camera::new(aspect_ratio, image_width, 500, 50);
+    let mut camera = Camera::new(aspect_ratio, image_width, spp, 50);
 
     camera.fov = 40.0;
     camera.look_from = DVec3::new(278.0, 278.0, -800.0);
@@ -193,26 +187,27 @@ fn teapot_hdri() -> PPMImage {
     let obj_mat = Arc::new(Dielectric::new(Color::new(1.0, 1.0, 1.0), 1.5, 0.0));
     let transform = Transform::new()
         .scale(DVec3::splat(85.0))
-        .rotate(DQuat::from_rotation_y(PI))
         .translate(DVec3::new(278.0, 0.0, 278.0));
 
-    if let Ok(meshes) = TriMesh::load_model("obj/teapot.obj", obj_mat, true) {
+    if let Ok(meshes) = TriMesh::load_model("obj/teapot.obj", obj_mat.clone(), true) {
         for mut mesh in meshes {
             mesh.transform = transform;
+            mesh.material = obj_mat.clone();
             world.add(Arc::new(mesh));
         }
     }
 
     let bvh_world = BvhNode::from_list(&world);
-    camera.render(&bvh_world, &lights)
+    render_gpu(&mut camera, &world, &lights, &bvh_world, spp as u32)
 }
 
 #[allow(dead_code)]
 fn dragon() -> PPMImage {
     let aspect_ratio = 4.0 / 3.0;
     let image_width = 1200;
+    let spp = 500;
 
-    let mut camera = Camera::new(aspect_ratio, image_width, 500, 50);
+    let mut camera = Camera::new(aspect_ratio, image_width, spp, 50);
 
     camera.fov = 22.0;
     camera.look_from = DVec3::new(-2.5, 4.0, 6.5);
@@ -259,50 +254,44 @@ fn dragon() -> PPMImage {
         .scale(DVec3::splat(3.4))
         .rotate(DQuat::from_rotation_y(FRAC_PI_2));
 
-    if let Ok(meshes) = TriMesh::load_model("obj/dragon.obj", obj_mat, true) {
+    if let Ok(meshes) = TriMesh::load_model("obj/dragon.obj", obj_mat.clone(), true) {
         for mut mesh in meshes {
             mesh.transform = transform;
+            mesh.material = obj_mat.clone();
             world.add(Arc::new(mesh));
         }
     }
 
     let bvh_world = BvhNode::from_list(&world);
-    camera.render(&bvh_world, &lights)
+    render_gpu(&mut camera, &world, &lights, &bvh_world, spp as u32)
 }
 
-// #[allow(dead_code)]
-// fn minecraft() -> PPMImage {
-//     let aspect_ratio = 21.0 / 9.0;
-//     let image_width = 600;
+fn render_gpu(
+    camera: &mut Camera,
+    world: &HittableList,
+    lights: &HittableList,
+    bvh: &BvhNode,
+    spp: u32,
+) -> PPMImage {
+    use gpu::renderer::GpuRenderer;
+    use gpu::serialize::SceneSerializer;
 
-//     let mut camera = Camera::new(aspect_ratio, image_width, 50, 50);
+    let mut serializer = SceneSerializer::new();
+    let mut scene = serializer.serialize(camera, world, lights, bvh);
 
-//     camera.fov = 60.0;
-//     camera.look_from = DVec3::new(0.0, 40.0, 40.0);
-//     camera.look_at = DVec3::new(0.0, 4.0, 0.0);
-//     camera.vup = DVec3::new(0.0, 1.0, 0.0);
+    if let Background::Hdri(ref hdri) = camera.background {
+        let (pixels, width, height) = hdri.get_data();
+        scene.camera.hdri_width = width as u32;
+        scene.camera.hdri_height = height as u32;
+        scene.hdri_pixels = pixels
+            .iter()
+            .map(|c| [c.r as f32, c.g as f32, c.b as f32, 0.0])
+            .collect();
+    }
 
-//     camera.defocus_angle = 0.0;
-//     camera.background = Background::Hdri(Hdri::new("hdri/golden_gate_hills_2k.hdr"));
-
-//     let mut world = HittableList::new();
-//     let mut lights = HittableList::new();
-
-//     let default_mat = Arc::new(Lambertian::new(Color::from_hex(0xFFFFFF)));
-//     let transform = Transform::new()
-//         .scale(DVec3::splat(3.4))
-//         .rotate(DQuat::from_rotation_y(FRAC_PI_2));
-
-//     if let Ok(meshes) = TriMesh::load_model("obj/world.obj", default_mat, false) {
-//         for mut mesh in meshes {
-//             // mesh.transform = transform;
-//             world.add(Arc::new(mesh));
-//         }
-//     }
-
-//     let bvh_world = BvhNode::from_list(&world);
-//     camera.render(&bvh_world, &lights)
-// }
+    let renderer = GpuRenderer::new();
+    renderer.render(&scene, spp)
+}
 
 fn main() {
     env_logger::init();

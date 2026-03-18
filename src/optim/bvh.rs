@@ -118,4 +118,8 @@ impl Hittable for BvhNode {
     fn bounding_box(&self) -> Aabb {
         self.bbox
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }

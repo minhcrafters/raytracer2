@@ -52,4 +52,8 @@ impl Hdri {
 
         self.pixels[j * self.width + i]
     }
+
+    pub fn get_data(&self) -> (&[Color], u32, u32) {
+        (&self.pixels, self.width as u32, self.height as u32)
+    }
 }

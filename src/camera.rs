@@ -111,7 +111,7 @@ impl Camera {
         image
     }
 
-    fn init(&mut self) {
+    pub fn init(&mut self) {
         let image_height = (self.image_width as f64 / self.aspect_ratio) as usize;
         self.image_height = if image_height < 1 { 1 } else { image_height };
         let actual_aspect_ratio = self.image_width as f64 / self.image_height as f64;
@@ -135,6 +135,19 @@ impl Camera {
         let defocus_radius = self.focus_dist * (self.defocus_angle / 2.0).to_radians().tan();
         self.defocus_disk_u = u * defocus_radius;
         self.defocus_disk_v = v * defocus_radius;
+    }
+
+    pub fn image_width(&self) -> usize {
+        self.image_width
+    }
+    pub fn image_height(&self) -> usize {
+        self.image_height
+    }
+    pub fn defocus_disk_u(&self) -> DVec3 {
+        self.defocus_disk_u
+    }
+    pub fn defocus_disk_v(&self) -> DVec3 {
+        self.defocus_disk_v
     }
 
     fn get_ray(&self, x: usize, y: usize) -> Ray {

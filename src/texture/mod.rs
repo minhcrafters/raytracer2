@@ -6,4 +6,5 @@ use glam::DVec3;
 
 pub trait Texture: Send + Sync {
     fn value(&self, u: f64, v: f64, p: DVec3) -> Color;
+    fn as_any(&self) -> &dyn std::any::Any;
 }

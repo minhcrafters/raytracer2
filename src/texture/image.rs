@@ -58,4 +58,29 @@ impl Texture for ImageTexture {
             color_scale * rgb[2] as f64,
         )
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+impl ImageTexture {
+    pub fn get_pixel_data(&self) -> Option<(Vec<[f32; 3]>, u32, u32)> {
+        self.image.as_ref().map(|img| {
+            let (width, height) = img.dimensions();
+            let mut data = Vec::with_capacity((width * height) as usize);
+            for y in 0..height {
+                for x in 0..width {
+                    let pixel = img.get_pixel(x, y);
+                    let rgb = pixel.0;
+                    data.push([
+                        rgb[0] as f32 / 255.0,
+                        rgb[1] as f32 / 255.0,
+                        rgb[2] as f32 / 255.0,
+                    ]);
+                }
+            }
+            (data, width, height)
+        })
+    }
 }
