@@ -310,7 +310,9 @@ bool aabb_hit(vec3 bmin, vec3 bmax, Ray r, float t_min, float t_max) {
         float t0 = (bmin[a] - orig) * inv_d;
         float t1 = (bmax[a] - orig) * inv_d;
         if (inv_d < 0.0) {
-            float tmp = t0; t0 = t1; t1 = tmp;
+            float tmp = t0;
+            t0 = t1;
+            t1 = tmp;
         }
         if (t0 > t_min) t_min = t0;
         if (t1 < t_max) t_max = t1;
@@ -480,8 +482,8 @@ bool trace_scene(Ray r, float t_min, float t_max, inout HitRecord best_rec) {
             }
         } else {
             if (sp < 62) {
-                stack[sp++] = node.left_or_prim;   // left child
-                stack[sp++] = node.right_or_count;  // right child
+                stack[sp++] = node.left_or_prim; // left child
+                stack[sp++] = node.right_or_count; // right child
             }
         }
     }
@@ -805,7 +807,7 @@ void main() {
     Ray initial_ray = make_ray(ray_origin, ray_dir_world);
 
     vec3 color = trace_path(initial_ray);
-e
+
     accum[pixel_index] += vec4(color, 1.0);
 
     float sample_count = accum[pixel_index].w;

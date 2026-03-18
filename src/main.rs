@@ -33,9 +33,9 @@ use glam::{DQuat, DVec3};
 fn cornell_box() -> PPMImage {
     let aspect_ratio = 1.0;
     let image_width = 1024;
-    let spp = 500;
+    let spp = 1000;
 
-    let mut camera = Camera::new(aspect_ratio, image_width, spp, 10);
+    let mut camera = Camera::new(aspect_ratio, image_width, spp, 50);
 
     camera.fov = 0.686 * 180.0 / std::f64::consts::PI;
     camera.look_from = DVec3::new(278.0, 273.0, -800.0);
