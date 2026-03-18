@@ -55,9 +55,23 @@ pub fn random_in_unit_disk() -> DVec3 {
     }
 }
 
-pub fn linear_to_gamma(linear: f64) -> f64 {
+fn hable_operator(x: f64) -> f64 {
+    let a = 0.15;
+    let b = 0.50;
+    let c = 0.10;
+    let d = 0.20;
+    let e = 0.02;
+    let f = 0.30;
+    ((x * (a * x + c * b) + d * e) / (x * (a * x + b) + d * f)) - e / f
+}
+
+pub fn tonemap(linear: f64) -> f64 {
     if linear > 0.0 {
-        linear.powf(1.0 / 2.2)
+        let exposure_bias = 2.0;
+        let curr = hable_operator(linear * exposure_bias);
+        let white_scale = 1.0 / hable_operator(11.2);
+        let color = curr * white_scale;
+        color.clamp(0.0, 1.0).powf(1.0 / 2.2)
     } else {
         0.0
     }

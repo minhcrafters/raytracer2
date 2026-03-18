@@ -3,6 +3,7 @@ use crate::{
     utils::{random_cosine_direction, random_f64},
 };
 use glam::DVec3;
+use std::f64::consts::PI;
 
 pub trait Pdf {
     fn value(&self, direction: DVec3) -> f64;

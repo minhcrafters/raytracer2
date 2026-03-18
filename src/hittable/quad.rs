@@ -21,9 +21,9 @@ pub struct Quad {
 
 impl Quad {
     pub fn new() -> Self {
-        let q = DVec3::new(-0.5, -0.5, 0.0);
+        let q = DVec3::new(-0.5, 0.0, -0.5);
         let u = DVec3::new(1.0, 0.0, 0.0);
-        let v = DVec3::new(0.0, 1.0, 0.0);
+        let v = DVec3::new(0.0, 0.0, 1.0);
         let material = None;
 
         let n = u.cross(v);
@@ -91,22 +91,6 @@ impl Quad {
             d,
             w,
         }
-    }
-
-    pub fn cube(center: DVec3, size: f64, material: Option<Arc<dyn Material>>) -> Vec<Self> {
-        let half_size = size / 2.0;
-        let u = DVec3::new(size, 0.0, 0.0);
-        let v = DVec3::new(0.0, size, 0.0);
-        let w = DVec3::new(0.0, 0.0, size);
-
-        vec![
-            Quad::from_points(center - half_size * (u + v + w), u, v, material.clone()), // Front face
-            Quad::from_points(center - half_size * (u + v - w), u, -v, material.clone()), // Back face
-            Quad::from_points(center - half_size * (u - v + w), u, w, material.clone()), // Top face
-            Quad::from_points(center - half_size * (u - v - w), u, -w, material.clone()), // Bottom face
-            Quad::from_points(center - half_size * (-u + v + w), v, w, material.clone()), // Left face
-            Quad::from_points(center - half_size * (-u + v - w), v, -w, material.clone()), // Right face
-        ]
     }
 }
 

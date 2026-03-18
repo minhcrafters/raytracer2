@@ -1,3 +1,4 @@
+pub mod cuboid;
 pub mod model;
 pub mod quad;
 pub mod sphere;

@@ -1,6 +1,6 @@
 use glam::DVec3;
 
-use super::{interval::Interval, transform::Transform, Ray};
+use super::{Ray, interval::Interval, transform::Transform};
 
 #[derive(Clone, Copy)]
 pub struct Aabb {
@@ -86,7 +86,20 @@ impl Aabb {
             }
         }
 
-        Self::from_points(min, max)
+        let mut bbox = Self::from_points(min, max);
+
+        let delta = 0.0001;
+        if bbox.x.size() < delta {
+            bbox.x = Interval::new(bbox.x.min - delta / 2.0, bbox.x.max + delta / 2.0);
+        }
+        if bbox.y.size() < delta {
+            bbox.y = Interval::new(bbox.y.min - delta / 2.0, bbox.y.max + delta / 2.0);
+        }
+        if bbox.z.size() < delta {
+            bbox.z = Interval::new(bbox.z.min - delta / 2.0, bbox.z.max + delta / 2.0);
+        }
+
+        bbox
     }
 }
 

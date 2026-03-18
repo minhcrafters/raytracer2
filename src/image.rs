@@ -6,7 +6,7 @@ use std::path::Path;
 use glam::DVec3;
 use image::{Rgb, RgbImage};
 
-use crate::utils::linear_to_gamma;
+use crate::utils::tonemap;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Color {
@@ -41,8 +41,12 @@ impl Color {
         )
     }
 
-    pub fn from_float(r: f64, g: f64, b: f64) -> Self {
-        Self { r, g, b }
+    pub fn from_rgb(r: u8, g: u8, b: u8) -> Self {
+        Self {
+            r: r as f64 / 255.0,
+            g: g as f64 / 255.0,
+            b: b as f64 / 255.0,
+        }
     }
 
     pub fn from_vec3(vec3: DVec3) -> Self {
@@ -53,7 +57,7 @@ impl Color {
         }
     }
 
-    pub fn from_hex(hex: i32) -> Self {
+    pub fn from_hex(hex: u32) -> Self {
         let r = ((hex >> 16) & 0xFF) as u8;
         let g = ((hex >> 8) & 0xFF) as u8;
         let b = (hex & 0xFF) as u8;
@@ -189,9 +193,9 @@ impl PPMImage {
     pub fn set_pixel(&mut self, x: usize, y: usize, color: &Color) {
         let index = (y * self.width + x) * 3;
 
-        let r = (linear_to_gamma(color.r) * 255.0) as u8;
-        let g = (linear_to_gamma(color.g) * 255.0) as u8;
-        let b = (linear_to_gamma(color.b) * 255.0) as u8;
+        let r = (tonemap(color.r) * 255.0) as u8;
+        let g = (tonemap(color.g) * 255.0) as u8;
+        let b = (tonemap(color.b) * 255.0) as u8;
 
         self.data[index] = r;
         self.data[index + 1] = g;
