@@ -25,4 +25,6 @@ pub trait Material: Send + Sync {
     fn emitted(&self, _ray_in: &Ray, _hit_record: &HitRecord) -> Color {
         Color::new(0.0, 0.0, 0.0)
     }
+
+    fn as_any(&self) -> &dyn std::any::Any;
 }

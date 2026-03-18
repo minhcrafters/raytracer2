@@ -24,4 +24,8 @@ impl Material for DiffuseLight {
             Color::new(0.0, 0.0, 0.0)
         }
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }

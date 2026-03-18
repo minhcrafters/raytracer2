@@ -41,4 +41,14 @@ impl Material for Lambertian {
         let cosine = hit_record.normal.dot(scattered.dir.normalize());
         if cosine < 0.0 { 0.0 } else { cosine / PI }
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+impl Lambertian {
+    pub fn get_albedo(&self) -> Arc<dyn Texture> {
+        self.albedo.clone()
+    }
 }

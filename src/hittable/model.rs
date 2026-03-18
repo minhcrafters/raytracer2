@@ -343,4 +343,6 @@ impl Hittable for TriMesh {
     fn bounding_box(&self) -> Aabb {
         self.bvh_root.bbox.transform(&self.transform)
     }
+    
+    fn as_any(&self) -> &dyn std::any::Any { self }
 }

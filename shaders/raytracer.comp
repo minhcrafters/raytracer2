@@ -1,0 +1,871 @@
+#version 450
+#extension GL_EXT_scalar_block_layout : enable
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+// ─── Constants ───
+const float PI = 3.14159265358979323846;
+const float INF = 1e30;
+const float EPSILON = 1e-6;
+
+const uint MAT_LAMBERTIAN = 0u;
+const uint MAT_METALLIC = 1u;
+const uint MAT_DIELECTRIC = 2u;
+const uint MAT_DIFFUSE_LIGHT = 3u;
+const uint MAT_SPECULAR = 4u;
+
+const uint PRIM_SPHERE = 0u;
+#define PRIM_QUAD    1
+#define PRIM_TRIANGLE 2
+
+const uint BG_COLOR = 0u;
+const uint BG_HDRI = 1u;
+
+// ─── Camera UBO ───
+layout(set = 0, binding = 0, std140) uniform CameraBlock {
+    mat4 inv_view;
+    mat4 inv_proj;
+    vec3 center;
+    uint image_width;
+    vec3 defocus_disk_u;
+    uint image_height;
+    vec3 defocus_disk_v;
+    uint max_depth;
+    float defocus_angle;
+    uint current_sample;
+    uint bg_type;
+    uint _pad0;
+    vec3 bg_color;
+    uint hdri_width;
+    uint hdri_height;
+    uint _pad1;
+    uint _pad2;
+    uint _pad3;
+} camera;
+
+// ─── Material ───
+struct GpuMaterial {
+    uint mat_type;
+    uint _pad0[3];
+    vec3 albedo;
+    float ior;
+    vec3 emit;
+    float fuzz;
+    float shininess;
+    uint has_texture;
+    uint tex_width;
+    uint tex_offset;
+};
+
+// ─── Transform ───
+struct GpuTransform {
+    mat4 m;
+    mat4 inv;
+};
+
+// ─── Sphere ───
+struct GpuSphere {
+    vec3 center;
+    float radius;
+};
+
+// ─── Quad ───
+struct GpuQuad {
+    vec3 q;
+    float d;
+    vec3 u;
+    float _pad0;
+    vec3 v;
+    float _pad1;
+    vec3 normal;
+    float _pad2;
+    vec3 w;
+    float _pad3;
+};
+
+// ─── Primitive ───
+struct GpuPrimitive {
+    uint prim_type;
+    uint data_index;
+    uint material_index;
+    uint transform_index;
+};
+
+// ─── BVH Node ───
+struct GpuBvhNode {
+    vec3 bbox_min;
+    uint left_or_prim;
+    vec3 bbox_max;
+    uint right_or_count;
+    uint is_leaf;
+    uint _pad[3];
+};
+
+// ─── TriBvh Node ───
+struct GpuTriBvhNode {
+    vec3 bbox_min;
+    uint left_or_start;
+    vec3 bbox_max;
+    uint right_or_count;
+    uint is_leaf;
+    uint _pad[3];
+};
+
+// ─── Light ───
+struct GpuLight {
+    uint prim_index;
+    uint _pad[3];
+};
+
+// ─── SSBOs ───
+layout(set = 0, binding = 1, std430) readonly buffer MaterialBuffer {
+    GpuMaterial materials[];
+};
+
+layout(set = 0, binding = 2, std430) readonly buffer TransformBuffer {
+    GpuTransform transforms[];
+};
+
+layout(set = 0, binding = 3, std430) readonly buffer SphereBuffer {
+    GpuSphere spheres[];
+};
+
+layout(set = 0, binding = 4, std430) readonly buffer QuadBuffer {
+    GpuQuad quads[];
+};
+
+layout(set = 0, binding = 5, std430) readonly buffer PrimitiveBuffer {
+    GpuPrimitive primitives[];
+};
+
+layout(set = 0, binding = 6, std430) readonly buffer BvhBuffer {
+    GpuBvhNode bvh_nodes[];
+};
+
+layout(set = 0, binding = 7, std430) readonly buffer LightBuffer {
+    uint light_count;
+    uint light_prim_indices[];
+};
+
+// ─── Triangle Data ───
+struct GpuTriangle {
+    vec4 v0;
+    vec4 v1;
+    vec4 v2;
+    vec4 n0;
+    vec4 n1;
+    vec4 n2;
+    vec2 uv0;
+    vec2 uv1;
+    vec2 uv2;
+    uint has_normals;
+    uint has_uvs;
+    uvec2 _pad6;
+};
+
+layout(set = 0, binding = 8, std430) readonly buffer TrianglesBuffer {
+    GpuTriangle triangles[];
+};
+
+// ─── HDRI and Texture Data ───
+layout(set = 0, binding = 9, std430) readonly buffer HdriBuffer {
+    vec4 hdri_pixels[];
+};
+
+layout(set = 0, binding = 10, std430) readonly buffer TexDataBuffer {
+    vec4 tex_pixels[];
+};
+
+// ─── Accumulation buffer ───
+layout(set = 0, binding = 11, std430) buffer AccumBuffer {
+    vec4 accum[];
+};
+
+// ─── Output image ───
+layout(set = 0, binding = 12, std430) buffer OutputBuffer {
+    vec4 output_pixels[];
+};
+
+// ─── RNG (PCG) ───
+uint rng_state;
+
+void pcg_init(uint pixel_index, uint sample_index) {
+    rng_state = pixel_index * 1103515245u + 12345u + sample_index * 747796405u;
+    // warm up
+    rng_state = rng_state * 747796405u + 2891336453u;
+    rng_state = rng_state * 747796405u + 2891336453u;
+}
+
+uint pcg_next() {
+    uint state = rng_state;
+    rng_state = state * 747796405u + 2891336453u;
+    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
+float rand_f() {
+    return float(pcg_next()) / 4294967295.0;
+}
+
+float rand_range(float mn, float mx) {
+    return mn + (mx - mn) * rand_f();
+}
+
+vec3 rand_vec3() {
+    return vec3(rand_f(), rand_f(), rand_f());
+}
+
+vec3 rand_vec3_range(float mn, float mx) {
+    return vec3(rand_range(mn, mx), rand_range(mn, mx), rand_range(mn, mx));
+}
+
+vec3 rand_unit_vec3() {
+    for (int i = 0; i < 100; i++) {
+        vec3 p = rand_vec3_range(-1.0, 1.0);
+        float lsq = dot(p, p);
+        if (lsq <= 1.0 && lsq > EPSILON) {
+            return normalize(p);
+        }
+    }
+    return vec3(0.0, 1.0, 0.0);
+}
+
+vec3 rand_in_unit_disk() {
+    for (int i = 0; i < 100; i++) {
+        vec3 p = vec3(rand_range(-1.0, 1.0), rand_range(-1.0, 1.0), 0.0);
+        if (dot(p, p) < 1.0) return p;
+    }
+    return vec3(0.0);
+}
+
+vec3 rand_cosine_direction() {
+    float r1 = rand_f();
+    float r2 = rand_f();
+    float phi = 2.0 * PI * r1;
+    float x = cos(phi) * sqrt(r2);
+    float y = sin(phi) * sqrt(r2);
+    float z = sqrt(1.0 - r2);
+    return vec3(x, y, z);
+}
+
+vec3 rand_to_sphere(float radius, float distance_squared) {
+    float r1 = rand_f();
+    float r2 = rand_f();
+    float z = 1.0 + r2 * (sqrt(max(0.0, 1.0 - radius * radius / distance_squared)) - 1.0);
+    float phi = 2.0 * PI * r1;
+    float sq = max(0.0, 1.0 - z * z);
+    float x = cos(phi) * sqrt(sq);
+    float y = sin(phi) * sqrt(sq);
+    return vec3(x, y, z);
+}
+
+// ─── Orthonormal basis ───
+struct ONB {
+    vec3 u, v, w;
+};
+
+ONB build_onb(vec3 n) {
+    ONB o;
+    o.w = normalize(n);
+    vec3 a = abs(o.w.x) > 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+    o.v = normalize(cross(o.w, a));
+    o.u = cross(o.w, o.v);
+    return o;
+}
+
+vec3 onb_local(ONB o, vec3 a) {
+    return a.x * o.u + a.y * o.v + a.z * o.w;
+}
+
+// ─── Transform helpers ───
+vec3 transform_point(mat4 m, vec3 p) {
+    vec4 r = m * vec4(p, 1.0);
+    return r.xyz / r.w;
+}
+
+vec3 transform_vector(mat4 m, vec3 v) {
+    return (m * vec4(v, 0.0)).xyz;
+}
+
+vec3 transform_normal(mat4 inv, vec3 n) {
+    return normalize((transpose(inv) * vec4(n, 0.0)).xyz);
+}
+
+// ─── Ray ───
+struct Ray {
+    vec3 origin;
+    vec3 dir;
+    vec3 inv_dir;
+};
+
+Ray make_ray(vec3 o, vec3 d) {
+    Ray r;
+    r.origin = o;
+    r.dir = d;
+    r.inv_dir = vec3(1.0 / d.x, 1.0 / d.y, 1.0 / d.z);
+    return r;
+}
+
+// ─── Hit Record ───
+struct HitRecord {
+    vec3 point;
+    vec3 normal;
+    float t;
+    float u_coord;
+    float v_coord;
+    uint material_index;
+    bool front_face;
+    bool valid;
+};
+
+void set_face_normal(inout HitRecord rec, Ray r, vec3 outward_normal) {
+    rec.front_face = dot(r.dir, outward_normal) < 0.0;
+    rec.normal = rec.front_face ? outward_normal : -outward_normal;
+}
+
+// ─── AABB hit test ───
+bool aabb_hit(vec3 bmin, vec3 bmax, Ray r, float t_min, float t_max) {
+    for (int a = 0; a < 3; a++) {
+        float inv_d = r.inv_dir[a];
+        float orig = r.origin[a];
+        float t0 = (bmin[a] - orig) * inv_d;
+        float t1 = (bmax[a] - orig) * inv_d;
+        if (inv_d < 0.0) {
+            float tmp = t0; t0 = t1; t1 = tmp;
+        }
+        if (t0 > t_min) t_min = t0;
+        if (t1 < t_max) t_max = t1;
+        if (t_max < t_min) return false;
+    }
+    return true;
+}
+
+// ─── Sphere intersection ───
+bool hit_sphere(uint sphere_idx, uint transform_idx, Ray r, float t_min, float t_max, inout HitRecord rec) {
+    GpuSphere s = spheres[sphere_idx];
+    GpuTransform tf = transforms[transform_idx];
+
+    vec3 ray_o = transform_point(tf.inv, r.origin);
+    vec3 ray_d = transform_vector(tf.inv, r.dir);
+
+    vec3 oc = s.center - ray_o;
+    float a = dot(ray_d, ray_d);
+    float h = dot(ray_d, oc);
+    float c = dot(oc, oc) - s.radius * s.radius;
+    float disc = h * h - a * c;
+    if (disc < 0.0) return false;
+
+    float sqrtd = sqrt(disc);
+    float root = (h - sqrtd) / a;
+    if (root <= t_min || root >= t_max) {
+        root = (h + sqrtd) / a;
+        if (root <= t_min || root >= t_max) return false;
+    }
+
+    vec3 p_obj = ray_o + root * ray_d;
+    vec3 n_obj = (p_obj - s.center) / s.radius;
+
+    rec.point = transform_point(tf.m, p_obj);
+    vec3 n_world = transform_normal(tf.inv, n_obj);
+    rec.t = root;
+    rec.u_coord = 0.0;
+    rec.v_coord = 0.0;
+    rec.valid = true;
+    set_face_normal(rec, r, n_world);
+    return true;
+}
+
+// ─── Quad intersection ───
+bool hit_quad(uint quad_idx, uint transform_idx, Ray r, float t_min, float t_max, inout HitRecord rec) {
+    GpuQuad q = quads[quad_idx];
+    GpuTransform tf = transforms[transform_idx];
+
+    vec3 ray_o = transform_point(tf.inv, r.origin);
+    vec3 ray_d = transform_vector(tf.inv, r.dir);
+
+    float denom = dot(q.normal, ray_d);
+    if (abs(denom) < 1e-8) return false;
+
+    float t = (q.d - dot(q.normal, ray_o)) / denom;
+    if (t < t_min || t > t_max) return false;
+
+    vec3 intersection = ray_o + t * ray_d;
+    vec3 planar = intersection - q.q;
+    float alpha = dot(q.w, cross(planar, q.v));
+    float beta = dot(q.w, cross(q.u, planar));
+
+    if (alpha < 0.0 || alpha > 1.0 || beta < 0.0 || beta > 1.0) return false;
+
+    vec3 n_world = transform_normal(tf.inv, q.normal);
+    rec.point = transform_point(tf.m, intersection);
+    rec.t = t;
+    rec.u_coord = alpha;
+    rec.v_coord = beta;
+    rec.valid = true;
+    set_face_normal(rec, r, n_world);
+    return true;
+}
+
+// ─── Triangle intersection ───
+bool hit_triangle(uint tri_idx, uint transform_idx, Ray r, float t_min, float t_max, inout HitRecord rec) {
+    GpuTriangle tri = triangles[tri_idx];
+    GpuTransform tf = transforms[transform_idx];
+
+    vec3 ray_o = transform_point(tf.inv, r.origin);
+    vec3 ray_d = transform_vector(tf.inv, r.dir);
+
+    vec3 p0 = tri.v0.xyz;
+    vec3 p1 = tri.v1.xyz;
+    vec3 p2 = tri.v2.xyz;
+
+    vec3 edge1 = p1 - p0;
+    vec3 edge2 = p2 - p0;
+    vec3 h = cross(ray_d, edge2);
+    float a = dot(edge1, h);
+    if (a > -1e-8 && a < 1e-8) return false;
+
+    float f = 1.0 / a;
+    vec3 s = ray_o - p0;
+    float u = f * dot(s, h);
+    if (u < 0.0 || u > 1.0) return false;
+
+    vec3 q = cross(s, edge1);
+    float v = f * dot(ray_d, q);
+    if (v < 0.0 || u + v > 1.0) return false;
+
+    float t = f * dot(edge2, q);
+    if (t > t_min && t < t_max) {
+        float w_bary = 1.0 - u - v;
+        vec3 n_obj;
+        if (tri.has_normals != 0u) {
+            n_obj = normalize(w_bary * tri.n0.xyz + u * tri.n1.xyz + v * tri.n2.xyz);
+        } else {
+            n_obj = normalize(cross(edge1, edge2));
+        }
+
+        float tex_u = u;
+        float tex_v = v;
+        if (tri.has_uvs != 0u) {
+            vec2 interp = w_bary * tri.uv0 + u * tri.uv1 + v * tri.uv2;
+            tex_u = interp.x;
+            tex_v = interp.y;
+        }
+
+        rec.point = transform_point(tf.m, ray_o + t * ray_d);
+        vec3 n_world = transform_normal(tf.inv, n_obj);
+        rec.t = t;
+        rec.u_coord = tex_u;
+        rec.v_coord = tex_v;
+        rec.valid = true;
+        set_face_normal(rec, r, n_world);
+        return true;
+    }
+    return false;
+}
+
+// ─── Scene-level BVH traversal ───
+bool trace_scene(Ray r, float t_min, float t_max, inout HitRecord best_rec) {
+    bool found = false;
+    float closest = t_max;
+    best_rec.valid = false;
+
+    uint stack[64];
+    int sp = 0;
+    stack[sp++] = 0u;
+
+    while (sp > 0) {
+        uint node_idx = stack[--sp];
+        GpuBvhNode node = bvh_nodes[node_idx];
+
+        if (!aabb_hit(node.bbox_min, node.bbox_max, r, t_min, closest))
+            continue;
+
+        if (node.is_leaf != 0u) {
+            for (uint i = 0; i < node.right_or_count; i++) {
+                uint prim_idx = node.left_or_prim + i;
+                GpuPrimitive prim = primitives[prim_idx];
+                HitRecord temp_rec;
+                temp_rec.valid = false;
+                bool hit = false;
+
+                if (prim.prim_type == PRIM_SPHERE) {
+                    hit = hit_sphere(prim.data_index, prim.transform_index, r, t_min, closest, temp_rec);
+                } else if (prim.prim_type == PRIM_QUAD) {
+                    hit = hit_quad(prim.data_index, prim.transform_index, r, t_min, closest, temp_rec);
+                } else if (prim.prim_type == PRIM_TRIANGLE) {
+                    hit = hit_triangle(prim.data_index, prim.transform_index, r, t_min, closest, temp_rec);
+                }
+
+                if (hit && temp_rec.valid && temp_rec.t < closest) {
+                    closest = temp_rec.t;
+                    temp_rec.material_index = prim.material_index;
+                    best_rec = temp_rec;
+                    found = true;
+                }
+            }
+        } else {
+            if (sp < 62) {
+                stack[sp++] = node.left_or_prim;   // left child
+                stack[sp++] = node.right_or_count;  // right child
+            }
+        }
+    }
+
+    return found;
+}
+
+// ─── Background sampling ───
+vec3 sample_background(vec3 dir) {
+    if (camera.bg_type == BG_COLOR) {
+        return camera.bg_color;
+    }
+    // HDRI equirectangular
+    vec3 d = normalize(dir);
+    float phi = atan(d.z, d.x);
+    float theta = asin(d.y);
+    float u = 1.0 - (phi + PI) / (2.0 * PI);
+    float v = (theta + PI * 0.5) / PI;
+
+    uint i = clamp(uint(u * float(camera.hdri_width)), 0u, camera.hdri_width - 1u);
+    uint j = clamp(uint((1.0 - v) * float(camera.hdri_height)), 0u, camera.hdri_height - 1u);
+    uint idx = j * camera.hdri_width + i;
+    return hdri_pixels[idx].rgb;
+}
+
+// ─── Texture sampling ───
+vec3 sample_texture(GpuMaterial mat, float u, float v) {
+    if (mat.has_texture == 0u) return mat.albedo;
+    u = clamp(u, 0.0, 1.0);
+    v = 1.0 - clamp(v, 0.0, 1.0); // flip V
+    uint tex_h = mat.tex_offset; // tex_offset is the start index in tex_pixels
+    // tex_width is stored; we need height too but we pack width*height pixels starting at offset
+    // For simplicity, assume tex_width is the width, and height = (total_pixels)/width
+    // Actually, we just compute pixel coords:
+    uint tw = mat.tex_width;
+    if (tw == 0u) return mat.albedo;
+    // We need to know height, but we store total pixel count in the texture buffer
+    // For now, just sample flat
+    uint total = uint(tex_pixels.length()) - mat.tex_offset;
+    uint th = total / tw;
+    uint px = clamp(uint(u * float(tw)), 0u, tw - 1u);
+    uint py = clamp(uint(v * float(th)), 0u, th - 1u);
+    uint idx = mat.tex_offset + py * tw + px;
+    return tex_pixels[idx].rgb;
+}
+
+// ─── Schlick reflectance ───
+float schlick(float cosine, float ior) {
+    float r0 = ((1.0 - ior) / (1.0 + ior));
+    r0 = r0 * r0;
+    return r0 + (1.0 - r0) * pow(1.0 - cosine, 5.0);
+}
+
+// ─── Material scatter result ───
+struct ScatterResult {
+    vec3 attenuation;
+    vec3 scattered_dir;
+    bool skip_pdf;
+    bool did_scatter;
+    float scattering_pdf_val;
+};
+
+// ─── Material scattering ───
+ScatterResult scatter_material(uint mat_idx, Ray r_in, HitRecord rec) {
+    ScatterResult result;
+    result.did_scatter = false;
+    result.skip_pdf = false;
+    result.attenuation = vec3(0.0);
+    result.scattered_dir = vec3(0.0);
+    result.scattering_pdf_val = 0.0;
+
+    GpuMaterial mat = materials[mat_idx];
+
+    if (mat.mat_type == MAT_LAMBERTIAN) {
+        // Use PDF-based sampling
+        ONB uvw = build_onb(rec.normal);
+        vec3 scatter_dir = onb_local(uvw, rand_cosine_direction());
+        result.attenuation = sample_texture(mat, rec.u_coord, rec.v_coord);
+        result.scattered_dir = scatter_dir;
+        result.skip_pdf = false;
+        result.did_scatter = true;
+        float cosine = dot(rec.normal, normalize(scatter_dir));
+        result.scattering_pdf_val = cosine > 0.0 ? cosine / PI : 0.0;
+    }
+    else if (mat.mat_type == MAT_METALLIC) {
+        vec3 reflected = reflect(normalize(r_in.dir), rec.normal) + mat.fuzz * rand_unit_vec3();
+        if (dot(reflected, rec.normal) > 0.0) {
+            result.attenuation = mat.albedo;
+            result.scattered_dir = reflected;
+            result.skip_pdf = true;
+            result.did_scatter = true;
+        }
+    }
+    else if (mat.mat_type == MAT_DIELECTRIC) {
+        float ior = rec.front_face ? (1.0 / mat.ior) : mat.ior;
+        vec3 unit_dir = normalize(r_in.dir);
+        float cos_theta = min(dot(-unit_dir, rec.normal), 1.0);
+        float sin_theta = sqrt(1.0 - cos_theta * cos_theta);
+        bool cannot_refract = ior * sin_theta > 1.0;
+        vec3 direction;
+        if (cannot_refract || schlick(cos_theta, ior) > rand_f()) {
+            direction = reflect(unit_dir, rec.normal) + mat.fuzz * rand_unit_vec3();
+        } else {
+            direction = refract(unit_dir, rec.normal, ior) + mat.fuzz * rand_unit_vec3();
+        }
+        result.attenuation = mat.albedo;
+        result.scattered_dir = direction;
+        result.skip_pdf = true;
+        result.did_scatter = true;
+    }
+    else if (mat.mat_type == MAT_SPECULAR) {
+        vec3 unit_dir = normalize(r_in.dir);
+        float cos_theta = clamp(dot(-unit_dir, rec.normal), 0.0, 1.0);
+        float reflectance = schlick(cos_theta, mat.ior);
+        bool is_specular = rand_f() < reflectance;
+
+        if (is_specular) {
+            float fuzz = mat.shininess > 0.0 ? 1.0 / mat.shininess : 1.0;
+            vec3 reflected = reflect(unit_dir, rec.normal) + fuzz * rand_unit_vec3();
+            if (dot(reflected, rec.normal) > 0.0) {
+                result.attenuation = vec3(1.0);
+                result.scattered_dir = reflected;
+                result.skip_pdf = true;
+                result.did_scatter = true;
+            }
+        } else {
+            ONB uvw = build_onb(rec.normal);
+            vec3 scatter_dir = onb_local(uvw, rand_cosine_direction());
+            result.attenuation = mat.albedo;
+            result.scattered_dir = scatter_dir;
+            result.skip_pdf = false;
+            result.did_scatter = true;
+            float cosine = dot(rec.normal, normalize(scatter_dir));
+            result.scattering_pdf_val = cosine > 0.0 ? cosine / PI : 0.0;
+        }
+    }
+    // MAT_DIFFUSE_LIGHT: does not scatter
+
+    return result;
+}
+
+// ─── Emission ───
+vec3 material_emit(uint mat_idx, HitRecord rec) {
+    GpuMaterial mat = materials[mat_idx];
+    if (mat.mat_type == MAT_DIFFUSE_LIGHT && rec.front_face) {
+        return mat.emit;
+    }
+    return vec3(0.0);
+}
+
+// ─── Light sampling helpers ───
+// Generate a random direction toward a light primitive
+vec3 light_random(uint light_prim_idx, vec3 origin) {
+    GpuPrimitive prim = primitives[light_prim_idx];
+    GpuTransform tf = transforms[prim.transform_index];
+
+    if (prim.prim_type == PRIM_SPHERE) {
+        GpuSphere s = spheres[prim.data_index];
+        vec3 center_world = transform_point(tf.m, s.center);
+        float radius_world = length(transform_vector(tf.m, vec3(s.radius, 0.0, 0.0)));
+        vec3 direction = center_world - origin;
+        float dist_sq = dot(direction, direction);
+        ONB uvw = build_onb(direction);
+        return onb_local(uvw, rand_to_sphere(radius_world, dist_sq));
+    }
+    else if (prim.prim_type == PRIM_QUAD) {
+        GpuQuad q = quads[prim.data_index];
+        vec3 p_obj = q.q + rand_f() * q.u + rand_f() * q.v;
+        vec3 p_world = transform_point(tf.m, p_obj);
+        return p_world - origin;
+    }
+    // Default
+    return vec3(1.0, 0.0, 0.0);
+}
+
+// PDF value for a light primitive
+float light_pdf_value(uint light_prim_idx, vec3 origin, vec3 direction) {
+    GpuPrimitive prim = primitives[light_prim_idx];
+    GpuTransform tf = transforms[prim.transform_index];
+
+    // First test if ray hits the primitive
+    Ray test_ray = make_ray(origin, direction);
+    HitRecord test_rec;
+    test_rec.valid = false;
+    bool did_hit = false;
+
+    if (prim.prim_type == PRIM_SPHERE) {
+        did_hit = hit_sphere(prim.data_index, prim.transform_index, test_ray, 0.001, INF, test_rec);
+        if (did_hit) {
+            GpuSphere s = spheres[prim.data_index];
+            vec3 center_world = transform_point(tf.m, s.center);
+            float radius_world = length(transform_vector(tf.m, vec3(s.radius, 0.0, 0.0)));
+            float cos_theta_max = sqrt(max(0.0, 1.0 - radius_world * radius_world / dot(center_world - origin, center_world - origin)));
+            float solid_angle = 2.0 * PI * (1.0 - cos_theta_max);
+            return 1.0 / solid_angle;
+        }
+    }
+    else if (prim.prim_type == PRIM_QUAD) {
+        did_hit = hit_quad(prim.data_index, prim.transform_index, test_ray, 0.001, INF, test_rec);
+        if (did_hit) {
+            GpuQuad q = quads[prim.data_index];
+            float dist_sq = test_rec.t * test_rec.t * dot(direction, direction);
+            float cosine = abs(dot(direction, test_rec.normal) / length(direction));
+            vec3 world_u = transform_vector(tf.m, q.u);
+            vec3 world_v = transform_vector(tf.m, q.v);
+            float area = length(cross(world_u, world_v));
+            return dist_sq / (cosine * area);
+        }
+    }
+
+    return 0.0;
+}
+
+// Sample all lights mixture PDF
+float lights_pdf_value(vec3 origin, vec3 direction) {
+    if (light_count == 0u) return 0.0;
+    float weight = 1.0 / float(light_count);
+    float sum = 0.0;
+    for (uint i = 0; i < light_count; i++) {
+        sum += weight * light_pdf_value(light_prim_indices[i], origin, direction);
+    }
+    return sum;
+}
+
+vec3 lights_random(vec3 origin) {
+    if (light_count == 0u) return vec3(1.0, 0.0, 0.0);
+    uint idx = clamp(uint(rand_f() * float(light_count)), 0u, light_count - 1u);
+    return light_random(light_prim_indices[idx], origin);
+}
+
+// ─── Tonemapping (Hable) ───
+float hable_op(float x) {
+    float a = 0.15, b = 0.50, c = 0.10, d = 0.20, e = 0.02, f = 0.30;
+    return ((x * (a * x + c * b) + d * e) / (x * (a * x + b) + d * f)) - e / f;
+}
+
+float tonemap(float lin) {
+    if (lin > 0.0) {
+        float exposure_bias = 2.0;
+        float curr = hable_op(lin * exposure_bias);
+        float white_scale = 1.0 / hable_op(11.2);
+        float color = curr * white_scale;
+        return pow(clamp(color, 0.0, 1.0), 1.0 / 2.2);
+    }
+    return 0.0;
+}
+
+// ─── Main path tracing ───
+vec3 trace_path(Ray initial_ray) {
+    vec3 accumulated_color = vec3(0.0);
+    vec3 throughput = vec3(1.0);
+    Ray current_ray = initial_ray;
+
+    for (uint depth = 0; depth < camera.max_depth; depth++) {
+        HitRecord rec;
+        rec.valid = false;
+
+        if (!trace_scene(current_ray, 0.001, INF, rec)) {
+            // Miss — sample background
+            accumulated_color += throughput * sample_background(current_ray.dir);
+            break;
+        }
+
+        // Emission
+        vec3 emission = material_emit(rec.material_index, rec);
+        accumulated_color += throughput * emission;
+
+        // Scatter
+        ScatterResult sr = scatter_material(rec.material_index, current_ray, rec);
+        if (!sr.did_scatter) break;
+
+        if (sr.skip_pdf) {
+            // Specular / delta materials — just follow the reflected/refracted ray
+            throughput *= sr.attenuation;
+            current_ray = make_ray(rec.point, sr.scattered_dir);
+        } else {
+            // PDF-based scattering with importance sampling
+            vec3 scattered_dir;
+            float pdf_val;
+
+            if (light_count > 0u) {
+                // Mixture PDF: 50% light, 50% material
+                if (rand_f() < 0.5) {
+                    scattered_dir = lights_random(rec.point);
+                } else {
+                    scattered_dir = sr.scattered_dir;
+                }
+                // Evaluate mixture PDF
+                float cosine_pdf = dot(rec.normal, normalize(scattered_dir));
+                cosine_pdf = cosine_pdf > 0.0 ? cosine_pdf / PI : 0.0;
+                float light_pdf = lights_pdf_value(rec.point, scattered_dir);
+                pdf_val = 0.5 * light_pdf + 0.5 * cosine_pdf;
+            } else {
+                scattered_dir = sr.scattered_dir;
+                float cosine_pdf = dot(rec.normal, normalize(scattered_dir));
+                pdf_val = cosine_pdf > 0.0 ? cosine_pdf / PI : 0.0;
+            }
+
+            if (pdf_val < 1e-10) break;
+
+            // Scattering PDF from material
+            float scattering_pdf = dot(rec.normal, normalize(scattered_dir));
+            scattering_pdf = scattering_pdf > 0.0 ? scattering_pdf / PI : 0.0;
+
+            throughput *= sr.attenuation * scattering_pdf / pdf_val;
+
+            // Clamp to avoid fireflies
+            throughput = min(throughput, vec3(10.0));
+            if (any(isnan(throughput))) throughput = vec3(0.0);
+
+            current_ray = make_ray(rec.point, scattered_dir);
+        }
+    }
+
+    return accumulated_color;
+}
+
+// ─── Main ───
+void main() {
+    uvec2 pixel = gl_GlobalInvocationID.xy;
+    if (pixel.x >= camera.image_width || pixel.y >= camera.image_height) return;
+
+    uint pixel_index = pixel.y * camera.image_width + pixel.x;
+    pcg_init(pixel_index, camera.current_sample);
+
+    // Generate camera ray
+    vec2 offset = vec2(rand_f() - 0.5, rand_f() - 0.5);
+    float s = (float(pixel.x) + offset.x) / float(camera.image_width);
+    float t = (float(pixel.y) + offset.y) / float(camera.image_height);
+
+    float ndc_x = s * 2.0 - 1.0;
+    float ndc_y = 1.0 - t * 2.0;
+
+    vec4 target_clip = vec4(ndc_x, ndc_y, -1.0, 1.0);
+    vec4 target_view4 = camera.inv_proj * target_clip;
+    vec3 target_view = target_view4.xyz / target_view4.w;
+    vec3 ray_dir_view = normalize(target_view);
+    vec3 ray_dir_world = normalize(transform_vector(camera.inv_view, ray_dir_view));
+
+    vec3 ray_origin;
+    if (camera.defocus_angle <= 0.0) {
+        ray_origin = camera.center;
+    } else {
+        vec3 p = rand_in_unit_disk();
+        ray_origin = camera.center + p.x * camera.defocus_disk_u + p.y * camera.defocus_disk_v;
+    }
+
+    Ray initial_ray = make_ray(ray_origin, ray_dir_world);
+
+    // Trace
+    vec3 color = trace_path(initial_ray);
+
+    // Accumulate
+    accum[pixel_index] += vec4(color, 1.0);
+
+    // Write final output (divide by sample count)
+    float sample_count = accum[pixel_index].w;
+    vec3 avg = accum[pixel_index].rgb / sample_count;
+
+    // Tonemap
+    output_pixels[pixel_index] = vec4(tonemap(avg.r), tonemap(avg.g), tonemap(avg.b), 1.0);
+}

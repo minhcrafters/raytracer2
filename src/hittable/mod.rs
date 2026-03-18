@@ -45,6 +45,7 @@ pub trait Hittable: Send + Sync {
     }
     fn hit(&self, r: &Ray, interval: &Interval) -> Option<HitRecord>;
     fn bounding_box(&self) -> Aabb;
+    fn as_any(&self) -> &dyn std::any::Any;
 }
 
 pub struct HittableList {
@@ -119,4 +120,6 @@ impl Hittable for HittableList {
         let rand_idx = rand_idx.clamp(0, int_size.saturating_sub(1));
         self.objects[rand_idx].random(origin)
     }
+
+    fn as_any(&self) -> &dyn std::any::Any { self }
 }

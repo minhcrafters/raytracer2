@@ -16,10 +16,18 @@ impl SolidColor {
             color_value: Color::new(r, g, b),
         }
     }
+
+    pub fn get_color(&self) -> Color {
+        self.color_value
+    }
 }
 
 impl Texture for SolidColor {
     fn value(&self, _u: f64, _v: f64, _p: DVec3) -> Color {
         self.color_value
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }

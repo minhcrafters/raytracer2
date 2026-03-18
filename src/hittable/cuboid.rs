@@ -25,14 +25,44 @@ impl Cuboid {
         let dy = DVec3::new(0.0, max.y - min.y, 0.0);
         let dz = DVec3::new(0.0, 0.0, max.z - min.z);
 
-        let faces = vec![
-            Quad::from_points(DVec3::new(min.x, min.y, max.z), dx, dy, material.clone()), // front
-            Quad::from_points(DVec3::new(max.x, min.y, max.z), -dz, dy, material.clone()), // right
-            Quad::from_points(DVec3::new(max.x, min.y, min.z), -dx, dy, material.clone()), // back
-            Quad::from_points(DVec3::new(min.x, min.y, min.z), dz, dy, material.clone()), // left
-            Quad::from_points(DVec3::new(min.x, max.y, max.z), dx, -dz, material.clone()), // top
-            Quad::from_points(DVec3::new(min.x, min.y, min.z), dx, dz, material.clone()), // bottom
-        ];
+        let mut faces = Vec::with_capacity(6);
+
+        faces.push(Quad::from_points(
+            DVec3::new(min.x, min.y, max.z),
+            dx,
+            dy,
+            material.clone(),
+        ));
+        faces.push(Quad::from_points(
+            DVec3::new(max.x, min.y, min.z),
+            -dx,
+            dy,
+            material.clone(),
+        ));
+        faces.push(Quad::from_points(
+            DVec3::new(min.x, min.y, min.z),
+            dz,
+            dy,
+            material.clone(),
+        ));
+        faces.push(Quad::from_points(
+            DVec3::new(max.x, min.y, max.z),
+            -dz,
+            dy,
+            material.clone(),
+        ));
+        faces.push(Quad::from_points(
+            DVec3::new(min.x, max.y, max.z),
+            dx,
+            -dz,
+            material.clone(),
+        ));
+        faces.push(Quad::from_points(
+            DVec3::new(min.x, min.y, min.z),
+            dx,
+            dz,
+            material.clone(),
+        ));
 
         let mut bbox = Aabb::default();
         for face in &faces {
@@ -41,9 +71,13 @@ impl Cuboid {
 
         Self {
             faces,
-            transform: Transform::default(),
             bbox,
+            transform: Transform::default(),
         }
+    }
+
+    pub fn faces(&self) -> &Vec<Quad> {
+        &self.faces
     }
 }
 
@@ -79,6 +113,12 @@ impl Hittable for Cuboid {
         self.bbox.transform(&self.transform)
     }
 
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+impl Cuboid {
     fn pdf_value(&self, origin: DVec3, direction: DVec3) -> f64 {
         let weight = 1.0 / self.faces.len() as f64;
         let mut sum = 0.0;

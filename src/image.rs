@@ -202,6 +202,13 @@ impl PPMImage {
         self.data[index + 2] = b;
     }
 
+    pub fn set_pixel_raw(&mut self, x: usize, y: usize, r: u8, g: u8, b: u8) {
+        let index = (y * self.width + x) * 3;
+        self.data[index] = r;
+        self.data[index + 1] = g;
+        self.data[index + 2] = b;
+    }
+
     pub fn save<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
         let mut file = File::create(path)?;
         writeln!(file, "P6")?;

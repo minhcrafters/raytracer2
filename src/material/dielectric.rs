@@ -52,6 +52,10 @@ impl Material for Dielectric {
             skip_pdf_ray: scattered_ray,
         })
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 impl Dielectric {
