@@ -227,7 +227,7 @@ impl Camera {
                         * self.ray_color(&scattered, depth - 1, world, lights))
                         / pdf_val;
 
-                    // Clamping to avoid fireflies, especially from HDRIs
+                    // Avoid fireflies
                     let mut final_color = emission + scatter_color;
                     final_color.r = final_color.r.min(10.0);
                     final_color.g = final_color.g.min(10.0);

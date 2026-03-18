@@ -1,0 +1,9 @@
+pub mod image;
+pub mod solid_color;
+
+use crate::image::Color;
+use glam::DVec3;
+
+pub trait Texture: Send + Sync {
+    fn value(&self, u: f64, v: f64, p: DVec3) -> Color;
+}

@@ -1,17 +1,20 @@
 use std::sync::Arc;
 
 use asset_importer::{Importer, postprocess::PostProcessSteps};
-use glam::DVec3;
+use glam::{DVec2, DVec3};
 
 use crate::{
     hittable::{HitRecord, Hittable},
-    material::Material,
+    image::Color,
+    material::{Material, lambertian::Lambertian},
     ray::{Ray, aabb::Aabb, interval::Interval, transform::Transform},
+    texture::image::ImageTexture,
 };
 
 pub struct TriMesh {
     pub vertices: Vec<DVec3>,
     pub normals: Vec<DVec3>,
+    pub uvs: Vec<DVec2>,
     pub indices: Vec<u32>,
     pub material: Arc<dyn Material>,
     pub smooth_normals: bool,
@@ -135,14 +138,24 @@ impl TriBvhNode {
                     closest_so_far = t;
                     let intersection_obj = ray_obj.at(t);
 
+                    let w = 1.0 - u - v;
                     let normal_obj = if mesh.smooth_normals && !mesh.normals.is_empty() {
                         let n0 = mesh.normals[i0];
                         let n1 = mesh.normals[i1];
                         let n2 = mesh.normals[i2];
-                        let w = 1.0 - u - v;
                         (w * n0 + u * n1 + v * n2).normalize()
                     } else {
                         edge1.cross(edge2).normalize()
+                    };
+
+                    let (tex_u, tex_v) = if !mesh.uvs.is_empty() {
+                        let uv0 = mesh.uvs[i0];
+                        let uv1 = mesh.uvs[i1];
+                        let uv2 = mesh.uvs[i2];
+                        let interp = w * uv0 + u * uv1 + v * uv2;
+                        (interp.x, interp.y)
+                    } else {
+                        (u, v)
                     };
 
                     let rec = HitRecord {
@@ -150,8 +163,8 @@ impl TriBvhNode {
                         normal: normal_obj,
                         material: Some(mesh.material.clone()),
                         t,
-                        u,
-                        v,
+                        u: tex_u,
+                        v: tex_v,
                         front_face: false,
                     };
 
@@ -186,7 +199,7 @@ impl TriBvhNode {
 impl TriMesh {
     pub fn load_model(
         path: &str,
-        material: Arc<dyn Material>,
+        default_mat: Arc<dyn Material>,
         smooth_normals: bool,
     ) -> Result<Vec<TriMesh>, Box<dyn std::error::Error>> {
         let mut meshes = Vec::new();
@@ -201,6 +214,25 @@ impl TriMesh {
             )
             .import()?;
 
+        let parent_dir = std::path::Path::new(path)
+            .parent()
+            .unwrap_or(std::path::Path::new(""));
+
+        let mut loaded_materials: Vec<Arc<dyn Material>> = Vec::new();
+
+        for mat in scene.materials() {
+            if let Some(tex_info) = mat.albedo_texture(0) {
+                let tex_path = parent_dir.join(tex_info.path);
+                let tex = Arc::new(ImageTexture::new(tex_path.to_str().unwrap()));
+                loaded_materials.push(Arc::new(Lambertian::with_texture(tex)));
+            } else if let Some(color) = mat.diffuse_color() {
+                let col = Color::new(color.x as f64, color.y as f64, color.z as f64);
+                loaded_materials.push(Arc::new(Lambertian::new(col)));
+            } else {
+                loaded_materials.push(default_mat.clone());
+            }
+        }
+
         for mesh in scene.meshes() {
             let vertices: Vec<DVec3> = mesh
                 .vertices_iter()
@@ -211,6 +243,14 @@ impl TriMesh {
                 .normals_iter()
                 .map(|n| DVec3::new(n.x as f64, n.y as f64, n.z as f64))
                 .collect();
+
+            let uvs: Vec<DVec2> = if mesh.has_texture_coords(0) {
+                mesh.texture_coords_iter2(0)
+                    .map(|uv| DVec2::new(uv.x as f64, uv.y as f64))
+                    .collect()
+            } else {
+                Vec::new()
+            };
 
             let mut indices = Vec::new();
             for face in mesh.faces() {
@@ -265,8 +305,12 @@ impl TriMesh {
             meshes.push(TriMesh {
                 vertices,
                 normals,
+                uvs,
                 indices: new_indices,
-                material: material.clone(),
+                material: loaded_materials
+                    .get(mesh.material_index())
+                    .cloned()
+                    .unwrap_or(default_mat.clone()),
                 smooth_normals,
                 transform: Transform::default(),
                 bvh_root,

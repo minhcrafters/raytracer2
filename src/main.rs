@@ -6,6 +6,7 @@ pub mod material;
 pub mod optim;
 pub mod pdf;
 pub mod ray;
+pub mod texture;
 pub mod utils;
 
 use std::{
@@ -27,6 +28,7 @@ use crate::{
 };
 use glam::{DQuat, DVec3};
 
+#[allow(dead_code)]
 fn cornell_box() -> PPMImage {
     let aspect_ratio = 1.0;
     let image_width = 1024;
@@ -39,7 +41,7 @@ fn cornell_box() -> PPMImage {
     camera.vup = DVec3::new(0.0, 1.0, 0.0);
 
     camera.defocus_angle = 0.0;
-    camera.background = Background::Color(Color::new(0.0, 0.0, 0.0));
+    camera.background = Background::Hdri(Hdri::new("hdri/german_town_street_4k.hdr"));
 
     let mut world = HittableList::new();
     let mut lights = HittableList::new();
@@ -125,21 +127,32 @@ fn cornell_box() -> PPMImage {
         .translate(DVec3::new(368.0, 165.0, 351.0));
     world.add(Arc::new(large_box));
 
-    let mut small_box = Cuboid::new(
-        DVec3::splat(-0.5),
-        DVec3::splat(0.5),
-        Some(box2_mat.clone()),
-    );
-    small_box.transform = Transform::new()
-        .scale(DVec3::new(165.0, 165.0, 165.0))
-        .rotate(DQuat::from_rotation_y(PI * 2.0 * (-197.0 / 360.0)))
-        .translate(DVec3::new(185.0, 82.5, 169.0));
-    world.add(Arc::new(small_box));
+    // let mut small_box = Cuboid::new(
+    //     DVec3::splat(-0.5),
+    //     DVec3::splat(0.5),
+    //     Some(box2_mat.clone()),
+    // );
+    // small_box.transform = Transform::new()
+    //     .scale(DVec3::new(165.0, 165.0, 165.0))
+    //     .rotate(DQuat::from_rotation_y(PI * 2.0 * (-197.0 / 360.0)))
+    //     .translate(DVec3::new(185.0, 82.5, 169.0));
+    // world.add(Arc::new(small_box));
+
+    if let Ok(meshes) = TriMesh::load_model("obj/n64_logo.obj", box2_mat.clone(), false) {
+        for mut mesh in meshes {
+            mesh.transform = Transform::new()
+                .scale(DVec3::new(165.0, 165.0, 165.0))
+                .rotate(DQuat::from_rotation_y(PI * 2.0 * (-197.0 / 360.0)))
+                .translate(DVec3::new(185.0, 82.5, 169.0));
+            world.add(Arc::new(mesh));
+        }
+    }
 
     let bvh_world = BvhNode::from_list(&world);
     camera.render(&bvh_world, &lights)
 }
 
+#[allow(dead_code)]
 fn teapot_hdri() -> PPMImage {
     let aspect_ratio = 1.0;
     let image_width = 1200;
@@ -194,11 +207,12 @@ fn teapot_hdri() -> PPMImage {
     camera.render(&bvh_world, &lights)
 }
 
+#[allow(dead_code)]
 fn dragon() -> PPMImage {
     let aspect_ratio = 4.0 / 3.0;
     let image_width = 1200;
 
-    let mut camera = Camera::new(aspect_ratio, image_width, 50, 50);
+    let mut camera = Camera::new(aspect_ratio, image_width, 500, 50);
 
     camera.fov = 22.0;
     camera.look_from = DVec3::new(-2.5, 4.0, 6.5);
@@ -256,10 +270,44 @@ fn dragon() -> PPMImage {
     camera.render(&bvh_world, &lights)
 }
 
+// #[allow(dead_code)]
+// fn minecraft() -> PPMImage {
+//     let aspect_ratio = 21.0 / 9.0;
+//     let image_width = 600;
+
+//     let mut camera = Camera::new(aspect_ratio, image_width, 50, 50);
+
+//     camera.fov = 60.0;
+//     camera.look_from = DVec3::new(0.0, 40.0, 40.0);
+//     camera.look_at = DVec3::new(0.0, 4.0, 0.0);
+//     camera.vup = DVec3::new(0.0, 1.0, 0.0);
+
+//     camera.defocus_angle = 0.0;
+//     camera.background = Background::Hdri(Hdri::new("hdri/golden_gate_hills_2k.hdr"));
+
+//     let mut world = HittableList::new();
+//     let mut lights = HittableList::new();
+
+//     let default_mat = Arc::new(Lambertian::new(Color::from_hex(0xFFFFFF)));
+//     let transform = Transform::new()
+//         .scale(DVec3::splat(3.4))
+//         .rotate(DQuat::from_rotation_y(FRAC_PI_2));
+
+//     if let Ok(meshes) = TriMesh::load_model("obj/world.obj", default_mat, false) {
+//         for mut mesh in meshes {
+//             // mesh.transform = transform;
+//             world.add(Arc::new(mesh));
+//         }
+//     }
+
+//     let bvh_world = BvhNode::from_list(&world);
+//     camera.render(&bvh_world, &lights)
+// }
+
 fn main() {
     env_logger::init();
 
-    let image = dragon();
+    let image = cornell_box();
 
     image.save("output.ppm").expect("Failed to save image");
 
