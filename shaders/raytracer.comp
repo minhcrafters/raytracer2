@@ -743,7 +743,7 @@ vec3 trace_path(Ray initial_ray) {
             if (light_count > 0u) {
                 // 50% light 50% material
                 if (rand_f() < 0.5) {
-                    scattered_dir = lights_random(rec.point);
+                    scattered_dir = normalize(lights_random(rec.point));
                 } else {
                     scattered_dir = sr.scattered_dir;
                 }

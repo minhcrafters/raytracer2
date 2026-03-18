@@ -18,6 +18,7 @@ use std::{
 use crate::{
     background::{Background, hdri::Hdri},
     camera::Camera,
+    gpu::{renderer::GpuRenderer, serialize::SceneSerializer},
     hittable::{HittableList, cuboid::Cuboid, model::TriMesh, quad::Quad, sphere::Sphere},
     image::{Color, PPMImage},
     material::{
@@ -33,7 +34,7 @@ use glam::{DQuat, DVec3};
 fn cornell_box() -> PPMImage {
     let aspect_ratio = 1.0;
     let image_width = 1024;
-    let spp = 1000;
+    let spp = 500;
 
     let mut camera = Camera::new(aspect_ratio, image_width, spp, 50);
 
@@ -140,8 +141,6 @@ fn cornell_box() -> PPMImage {
     }
 
     let bvh_world = BvhNode::from_list(&world);
-
-    // GPU rendering
     render_gpu(&mut camera, &world, &lights, &bvh_world, spp as u32)
 }
 
@@ -273,9 +272,6 @@ fn render_gpu(
     bvh: &BvhNode,
     spp: u32,
 ) -> PPMImage {
-    use gpu::renderer::GpuRenderer;
-    use gpu::serialize::SceneSerializer;
-
     let mut serializer = SceneSerializer::new();
     let mut scene = serializer.serialize(camera, world, lights, bvh);
 

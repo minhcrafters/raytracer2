@@ -254,7 +254,6 @@ impl Camera {
                     if final_color.b.is_nan() {
                         final_color.b = 0.0;
                     }
-
                     return final_color;
                 }
             }
