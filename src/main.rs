@@ -204,7 +204,7 @@ fn teapot_hdri() -> PPMImage {
 fn dragon() -> PPMImage {
     let aspect_ratio = 4.0 / 3.0;
     let image_width = 1200;
-    let spp = 1000;
+    let spp = 500;
 
     let mut camera = Camera::new(aspect_ratio, image_width, spp, 50);
 
