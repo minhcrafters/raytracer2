@@ -14,8 +14,8 @@ const uint MAT_DIFFUSE_LIGHT = 3u;
 const uint MAT_SPECULAR = 4u;
 
 const uint PRIM_SPHERE = 0u;
-#define PRIM_QUAD    1
-#define PRIM_TRIANGLE 2
+const uint PRIM_QUAD = 1u;
+const uint PRIM_TRIANGLE = 2u;
 
 const uint BG_COLOR = 0u;
 const uint BG_HDRI = 1u;

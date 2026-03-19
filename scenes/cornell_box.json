@@ -175,7 +175,7 @@
             "recompute_normals": true,
             "transforms": [
                 { "type": "scale", "value": [50.0, 50.0, 50.0] },
-                { "type": "translate", "value": [278.0, 0.0, 278.0] }
+                { "type": "translate", "value": [278.0, 0.0, 139.0] }
             ]
         }
     ],
