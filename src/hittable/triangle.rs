@@ -21,9 +21,9 @@ pub struct Triangle {
 
 impl Triangle {
     pub fn new() -> Self {
-        let q = DVec3::new(-0.5, -0.5, 0.0);
+        let q = DVec3::new(-0.5, 0.0, -0.5);
         let u = DVec3::new(1.0, 0.0, 0.0);
-        let v = DVec3::new(0.0, 1.0, 0.0);
+        let v = DVec3::new(0.0, 0.0, 1.0);
         let material = None;
 
         let n = u.cross(v);

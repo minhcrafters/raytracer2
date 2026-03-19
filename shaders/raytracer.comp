@@ -49,7 +49,7 @@ struct GpuMaterial {
     vec3 emit;
     float fuzz;
     float shininess;
-    uint has_texture;
+    uint tex_height;
     uint tex_width;
     uint tex_offset;
 };
@@ -499,7 +499,7 @@ vec3 sample_background(vec3 dir) {
     // equirectangular
     vec3 d = normalize(dir);
     float phi = atan(d.z, d.x);
-    float theta = asin(d.y);
+    float theta = asin(clamp(d.y, -1.0, 1.0));
     float u = 1.0 - (phi + PI) / (2.0 * PI);
     float v = (theta + PI * 0.5) / PI;
 
@@ -509,19 +509,21 @@ vec3 sample_background(vec3 dir) {
     return hdri_pixels[idx].rgb;
 }
 
-vec3 sample_texture(GpuMaterial mat, float u, float v) {
-    if (mat.has_texture == 0u) return mat.albedo;
-    u = clamp(u, 0.0, 1.0);
-    v = 1.0 - clamp(v, 0.0, 1.0); // flip V
-    uint tex_h = mat.tex_offset;
+vec4 sample_texture(GpuMaterial mat, float u, float v) {
+    if (mat.tex_height == 0u) return vec4(mat.albedo, 1.0);
+
+    // wrap UV coordinates
+    u = u - floor(u);
+    v = v - floor(v);
+
     uint tw = mat.tex_width;
-    if (tw == 0u) return mat.albedo;
-    uint total = uint(tex_pixels.length()) - mat.tex_offset;
-    uint th = total / tw;
+    uint th = mat.tex_height;
+    if (tw == 0u || th == 0u) return vec4(mat.albedo, 1.0);
+
     uint px = clamp(uint(u * float(tw)), 0u, tw - 1u);
     uint py = clamp(uint(v * float(th)), 0u, th - 1u);
     uint idx = mat.tex_offset + py * tw + px;
-    return tex_pixels[idx].rgb;
+    return tex_pixels[idx];
 }
 
 float schlick(float cosine, float ior) {
@@ -549,9 +551,19 @@ ScatterResult scatter_material(uint mat_idx, Ray r_in, HitRecord rec) {
     GpuMaterial mat = materials[mat_idx];
 
     if (mat.mat_type == MAT_LAMBERTIAN) {
-        ONB uvw = build_onb(rec.normal);
-        vec3 scatter_dir = onb_local(uvw, rand_cosine_direction());
-        result.attenuation = sample_texture(mat, rec.u_coord, rec.v_coord);
+        vec4 tex_sample = sample_texture(mat, rec.u_coord, rec.v_coord);
+
+        if (tex_sample.a < 0.5) {
+            result.attenuation = vec3(1.0);
+            result.scattered_dir = r_in.dir;
+            result.skip_pdf = true;
+            result.did_scatter = true;
+            return result;
+        }
+
+        vec3 scatter_dir = rec.normal + rand_unit_vec3();
+        if (near_zero(scatter_dir)) scatter_dir = rec.normal;
+        result.attenuation = tex_sample.rgb;
         result.scattered_dir = scatter_dir;
         result.skip_pdf = false;
         result.did_scatter = true;
@@ -792,10 +804,6 @@ vec3 trace_path(Ray initial_ray) {
 
             throughput *= sr.attenuation * scattering_pdf / pdf_val;
 
-            // avoid fireflies
-            throughput = min(throughput, vec3(10.0));
-            if (any(isnan(throughput))) throughput = vec3(0.0);
-
             current_ray = make_ray(rec.point, scattered_dir);
         }
 
@@ -808,6 +816,12 @@ vec3 trace_path(Ray initial_ray) {
             throughput *= 1.0 / p;
         }
     }
+
+    // avoid fireflies
+    accumulated_color = min(accumulated_color, vec3(10.0));
+    if (isnan(accumulated_color.x)) accumulated_color.x = 0.0;
+    if (isnan(accumulated_color.y)) accumulated_color.y = 0.0;
+    if (isnan(accumulated_color.z)) accumulated_color.z = 0.0;
 
     return accumulated_color;
 }

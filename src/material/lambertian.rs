@@ -26,7 +26,19 @@ impl Lambertian {
 }
 
 impl Material for Lambertian {
-    fn scatter<'a>(&self, _ray_in: &Ray, hit_record: &HitRecord) -> Option<ScatterRecord<'a>> {
+    fn scatter<'a>(&self, ray_in: &Ray, hit_record: &HitRecord) -> Option<ScatterRecord<'a>> {
+        let alpha = self
+            .albedo
+            .alpha(hit_record.u, hit_record.v, hit_record.point);
+        if alpha < 0.5 {
+            return Some(ScatterRecord {
+                attenuation: Color::new(1.0, 1.0, 1.0),
+                pdf: None,
+                skip_pdf: true,
+                skip_pdf_ray: Ray::new(hit_record.point, ray_in.dir, ray_in.time),
+            });
+        }
+
         Some(ScatterRecord {
             attenuation: self
                 .albedo

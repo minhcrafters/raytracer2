@@ -237,8 +237,14 @@ fn convert_material(
         return Arc::new(Metallic::new(albedo, fuzz));
     }
 
-    if let Some(tex) = mat.albedo_texture(0).or_else(|| mat.base_color_texture(0)) {
-        let tex_path = parent_dir.join(&tex.path);
+    if let Some(tex) = mat
+        .albedo_texture(0)
+        .or_else(|| mat.base_color_texture(0))
+        .or_else(|| mat.texture(asset_importer::material::TextureType::Diffuse, 0))
+    {
+        // Many material files use backslashes which fail on some platforms or if the model was made on Windows but loaded elsewhere
+        let clean_path = tex.path.replace("\\", "/");
+        let tex_path = parent_dir.join(&clean_path);
         if let Some(p) = tex_path.to_str() {
             return Arc::new(Lambertian::with_texture(Arc::new(ImageTexture::new(p))));
         }
@@ -277,7 +283,8 @@ impl TriMesh {
                 PostProcessSteps::TRIANGULATE
                     | PostProcessSteps::FLIP_UVS
                     | PostProcessSteps::JOIN_IDENTICAL_VERTICES
-                    | PostProcessSteps::GEN_SMOOTH_NORMALS,
+                    | PostProcessSteps::GEN_SMOOTH_NORMALS
+                    | PostProcessSteps::GEN_UV_COORDS,
             )
             .import()?;
 

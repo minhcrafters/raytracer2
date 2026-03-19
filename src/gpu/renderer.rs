@@ -333,10 +333,12 @@ impl GpuRenderer {
         data: &[T],
     ) -> wgpu::Buffer {
         if data.is_empty() {
-            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            let size = std::mem::size_of::<T>().max(16) as u64;
+            device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some(label),
-                contents: &[0u8; 16],
+                size,
                 usage: wgpu::BufferUsages::STORAGE,
+                mapped_at_creation: false,
             })
         } else {
             Self::create_storage_buffer(device, label, data)

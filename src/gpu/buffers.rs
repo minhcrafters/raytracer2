@@ -47,7 +47,7 @@ pub struct GpuMaterial {
     pub fuzz: f32,
     pub shininess: f32,
     // for texture-based materials
-    pub has_texture: u32,
+    pub tex_height: u32,
     pub tex_width: u32,
     pub tex_offset: u32, // offset into texture data buffer
 }

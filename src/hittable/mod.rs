@@ -121,5 +121,7 @@ impl Hittable for HittableList {
         self.objects[rand_idx].random(origin)
     }
 
-    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }

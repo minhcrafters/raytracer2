@@ -145,8 +145,10 @@ impl Hittable for Quad {
     fn bounding_box(&self) -> Aabb {
         self.bbox.transform(&self.transform)
     }
-    
-    fn as_any(&self) -> &dyn std::any::Any { self }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 
     fn pdf_value(&self, origin: DVec3, direction: DVec3) -> f64 {
         let ray = Ray::new(origin, direction, 0.0);

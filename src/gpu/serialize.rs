@@ -523,7 +523,7 @@ impl SceneSerializer {
                 emit: [0.0; 3],
                 fuzz: 0.0,
                 shininess: 0.0,
-                has_texture: 0,
+                tex_height: 0,
                 tex_width: 0,
                 tex_offset: 0,
             });
@@ -556,10 +556,10 @@ impl SceneSerializer {
             // Check if it has a texture
             let tex_any = lam.albedo.as_any();
             if let Some(img_tex) = tex_any.downcast_ref::<crate::texture::image::ImageTexture>() {
-                if let Some((pixels, width, _height)) = img_tex.get_pixel_data() {
+                if let Some((pixels, width, height)) = img_tex.get_pixel_data() {
                     let tex_offset = self.tex_pixels.len() as u32;
                     for p in &pixels {
-                        self.tex_pixels.push([p[0], p[1], p[2], 0.0]);
+                        self.tex_pixels.push(*p);
                     }
                     return GpuMaterial {
                         mat_type: MAT_LAMBERTIAN,
@@ -569,7 +569,7 @@ impl SceneSerializer {
                         emit: [0.0; 3],
                         fuzz: 0.0,
                         shininess: 0.0,
-                        has_texture: 1,
+                        tex_height: height,
                         tex_width: width,
                         tex_offset,
                     };
@@ -577,7 +577,7 @@ impl SceneSerializer {
             }
 
             // Solid color
-            let color = lam.albedo.value(0.0, 0.0, DVec3::ZERO);
+            let color = lam.albedo.value(0.0, 0.0, glam::DVec3::ZERO);
             GpuMaterial {
                 mat_type: MAT_LAMBERTIAN,
                 _pad0: [0; 3],
@@ -586,7 +586,7 @@ impl SceneSerializer {
                 emit: [0.0; 3],
                 fuzz: 0.0,
                 shininess: 0.0,
-                has_texture: 0,
+                tex_height: 0,
                 tex_width: 0,
                 tex_offset: 0,
             }
@@ -603,7 +603,7 @@ impl SceneSerializer {
                 emit: [0.0; 3],
                 fuzz: met.fuzz as f32,
                 shininess: 0.0,
-                has_texture: 0,
+                tex_height: 0,
                 tex_width: 0,
                 tex_offset: 0,
             }
@@ -620,7 +620,7 @@ impl SceneSerializer {
                 emit: [0.0; 3],
                 fuzz: die.fuzz as f32,
                 shininess: 0.0,
-                has_texture: 0,
+                tex_height: 0,
                 tex_width: 0,
                 tex_offset: 0,
             }
@@ -637,7 +637,7 @@ impl SceneSerializer {
                 ],
                 fuzz: 0.0,
                 shininess: 0.0,
-                has_texture: 0,
+                tex_height: 0,
                 tex_width: 0,
                 tex_offset: 0,
             }
@@ -654,7 +654,7 @@ impl SceneSerializer {
                 emit: [0.0; 3],
                 fuzz: 0.0,
                 shininess: spec.shininess as f32,
-                has_texture: 0,
+                tex_height: 0,
                 tex_width: 0,
                 tex_offset: 0,
             }
@@ -668,7 +668,7 @@ impl SceneSerializer {
                 emit: [0.0; 3],
                 fuzz: 0.0,
                 shininess: 0.0,
-                has_texture: 0,
+                tex_height: 0,
                 tex_width: 0,
                 tex_offset: 0,
             }

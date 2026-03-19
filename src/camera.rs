@@ -263,6 +263,10 @@ impl Camera {
 
                     let scattering_pdf = material.scattering_pdf(r, &hit, &scattered);
 
+                    if pdf_val < 1e-10 {
+                        return emission;
+                    }
+
                     let scatter_color = (attenuation
                         * scattering_pdf
                         * self.ray_color(&scattered, depth - 1, world, lights))

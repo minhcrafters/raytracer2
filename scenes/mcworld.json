@@ -1,0 +1,29 @@
+{
+    "render": {
+        "aspect_ratio": 1.7777777777777777,
+        "image_width": 1280,
+        "spp": 500,
+        "max_depth": 50,
+        "output": "mcworld_render"
+    },
+    "camera": {
+        "fov": 60,
+        "look_from": [50.0, 50.0, 50.0],
+        "look_at": [0.0, 0.0, 0.0],
+        "vup": [0.0, 1.0, 0.0],
+        "defocus_angle": 0.0
+    },
+    "background": {
+        "type": "hdri",
+        "path": "hdri/german_town_street_4k.hdr"
+    },
+    "materials": {},
+    "objects": [
+        {
+            "id": "minecraft_world",
+            "type": "trimesh",
+            "path": "obj/mcworld.obj",
+            "recompute_normals": true
+        }
+    ]
+}

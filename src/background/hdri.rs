@@ -37,7 +37,7 @@ impl Hdri {
         // Convert direction to spherical coordinates for equirectangular projection
         let dir = dir.normalize();
         let phi = dir.z.atan2(dir.x);
-        let theta = dir.y.asin();
+        let theta = dir.y.clamp(-1.0, 1.0).asin();
 
         // Map to UV coordinates
         let u = 1.0 - (phi + std::f64::consts::PI) / (2.0 * std::f64::consts::PI);
