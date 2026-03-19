@@ -1,4 +1,4 @@
 /target
 /book
-output.ppm
-output.png
+*.ppm
+*.png

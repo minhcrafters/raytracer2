@@ -1,12 +1,16 @@
+use std::path::Path;
 use std::sync::Arc;
 
-use asset_importer::{Importer, postprocess::PostProcessSteps};
+use asset_importer::{Importer, material::Material as AiMaterial, postprocess::PostProcessSteps};
 use glam::{DVec2, DVec3};
 
 use crate::{
     hittable::{HitRecord, Hittable},
     image::Color,
-    material::{Material, lambertian::Lambertian},
+    material::{
+        Material, dielectric::Dielectric, diffuse_light::DiffuseLight, lambertian::Lambertian,
+        metallic::Metallic, specular::Specular,
+    },
     ray::{Ray, aabb::Aabb, interval::Interval, transform::Transform},
     texture::image::ImageTexture,
 };
@@ -57,33 +61,31 @@ impl TriBvhNode {
             };
         }
 
-        let mut axis = 0;
         let x_size = bbox.x.size();
         let y_size = bbox.y.size();
         let z_size = bbox.z.size();
 
-        if y_size > x_size && y_size > z_size {
-            axis = 1;
+        let axis = if y_size > x_size && y_size > z_size {
+            1
         } else if z_size > x_size && z_size > y_size {
-            axis = 2;
-        }
+            2
+        } else {
+            0
+        };
 
         faces.sort_by(|a, b| {
-            let ac = a.centroid[axis];
-            let bc = b.centroid[axis];
-            ac.partial_cmp(&bc).unwrap_or(std::cmp::Ordering::Equal)
+            a.centroid[axis]
+                .partial_cmp(&b.centroid[axis])
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         let mid = num_tris / 2;
         let (left_faces, right_faces) = faces.split_at_mut(mid);
 
-        let left = Box::new(Self::build(left_faces, start_idx));
-        let right = Box::new(Self::build(right_faces, start_idx + mid));
-
         Self {
             bbox,
-            left: Some(left),
-            right: Some(right),
+            left: Some(Box::new(Self::build(left_faces, start_idx))),
+            right: Some(Box::new(Self::build(right_faces, start_idx + mid))),
             start_tri: 0,
             tri_count: 0,
         }
@@ -158,7 +160,7 @@ impl TriBvhNode {
                         (u, v)
                     };
 
-                    let rec = HitRecord {
+                    hit_record = Some(HitRecord {
                         point: intersection_obj,
                         normal: normal_obj,
                         material: Some(mesh.material.clone()),
@@ -166,9 +168,7 @@ impl TriBvhNode {
                         u: tex_u,
                         v: tex_v,
                         front_face: false,
-                    };
-
-                    hit_record = Some(rec);
+                    });
                 }
             }
             return hit_record;
@@ -188,12 +188,81 @@ impl TriBvhNode {
             .unwrap()
             .hit(mesh, ray_obj, &right_interval);
 
-        if hit_right.is_some() {
-            hit_right
+        hit_right.or(hit_left)
+    }
+}
+
+fn convert_material(
+    mat: &AiMaterial,
+    parent_dir: &Path,
+    default_mat: &Arc<dyn Material>,
+) -> Arc<dyn Material> {
+    let albedo_color = || -> Option<Color> {
+        // diffuse (wavefront obj) -> base color (gltf/pbr)
+        // check diffuse first because base_color often defaults to white in some importers
+        if let Some(c) = mat.diffuse_color() {
+            Some(Color::new(c.x as f64, c.y as f64, c.z as f64))
         } else {
-            hit_left
+            mat.base_color()
+                .map(|c| Color::new(c.x as f64, c.y as f64, c.z as f64))
+        }
+    };
+
+    let opacity = mat.opacity().unwrap_or(1.0);
+    let transmission = mat.transmission_factor().unwrap_or(0.0);
+
+    if opacity < 0.5 || transmission > 0.5 {
+        let color = albedo_color().unwrap_or(Color::WHITE);
+        let ior = mat.refraction_index().unwrap_or(1.5) as f64;
+        let roughness = mat.roughness_factor().unwrap_or(0.0).clamp(0.0, 1.0) as f64;
+        return Arc::new(Dielectric::new(color, ior, roughness));
+    }
+
+    if let Some(emit) = mat.emissive_color() {
+        if emit.x > 0.01 || emit.y > 0.01 || emit.z > 0.01 {
+            let scale = mat.emissive_intensity().unwrap_or(1.0) as f64;
+            let color = Color::new(
+                emit.x as f64 * scale,
+                emit.y as f64 * scale,
+                emit.z as f64 * scale,
+            );
+            return Arc::new(DiffuseLight::new(color));
         }
     }
+
+    let metallic = mat.metallic_factor().unwrap_or(0.0);
+    if metallic >= 0.5 {
+        let albedo = albedo_color().unwrap_or(Color::WHITE);
+        let fuzz = mat.roughness_factor().unwrap_or(0.5).clamp(0.0, 1.0) as f64;
+        return Arc::new(Metallic::new(albedo, fuzz));
+    }
+
+    if let Some(tex) = mat.albedo_texture(0).or_else(|| mat.base_color_texture(0)) {
+        let tex_path = parent_dir.join(&tex.path);
+        if let Some(p) = tex_path.to_str() {
+            return Arc::new(Lambertian::with_texture(Arc::new(ImageTexture::new(p))));
+        }
+    }
+
+    let shininess = mat.shininess().unwrap_or(0.0);
+    if shininess >= 64.0 {
+        // the "albedo" color is used for the diffuse component
+        // prefer the albedo (diffuse) color over the specular highlighted color
+        let color = albedo_color()
+            .or_else(|| {
+                mat.specular_color()
+                    .map(|c| Color::new(c.x as f64, c.y as f64, c.z as f64))
+            })
+            .unwrap_or(Color::WHITE);
+        let ior = mat.refraction_index().unwrap_or(1.5) as f64;
+        return Arc::new(Specular::new(color, ior, shininess as f64));
+    }
+
+    if let Some(color) = albedo_color() {
+        return Arc::new(Lambertian::new(color));
+    }
+
+    default_mat.clone()
 }
 
 impl TriMesh {
@@ -202,8 +271,6 @@ impl TriMesh {
         default_mat: Arc<dyn Material>,
         smooth_normals: bool,
     ) -> Result<Vec<TriMesh>, Box<dyn std::error::Error>> {
-        let mut meshes = Vec::new();
-
         let scene = Importer::new()
             .read_file(path)
             .with_post_process(
@@ -214,24 +281,14 @@ impl TriMesh {
             )
             .import()?;
 
-        let parent_dir = std::path::Path::new(path)
-            .parent()
-            .unwrap_or(std::path::Path::new(""));
+        let parent_dir = Path::new(path).parent().unwrap_or(Path::new(""));
 
-        let mut loaded_materials: Vec<Arc<dyn Material>> = Vec::new();
+        let loaded_materials: Vec<Arc<dyn Material>> = scene
+            .materials()
+            .map(|mat| convert_material(&mat, parent_dir, &default_mat))
+            .collect();
 
-        for mat in scene.materials() {
-            if let Some(tex_info) = mat.albedo_texture(0) {
-                let tex_path = parent_dir.join(tex_info.path);
-                let tex = Arc::new(ImageTexture::new(tex_path.to_str().unwrap()));
-                loaded_materials.push(Arc::new(Lambertian::with_texture(tex)));
-            } else if let Some(color) = mat.diffuse_color() {
-                let col = Color::new(color.x as f64, color.y as f64, color.z as f64);
-                loaded_materials.push(Arc::new(Lambertian::new(col)));
-            } else {
-                loaded_materials.push(default_mat.clone());
-            }
-        }
+        let mut meshes = Vec::new();
 
         for mesh in scene.meshes() {
             let vertices: Vec<DVec3> = mesh
@@ -252,19 +309,20 @@ impl TriMesh {
                 Vec::new()
             };
 
-            let mut indices = Vec::new();
+            let mut raw_indices = Vec::new();
             for face in mesh.faces() {
                 let face_indices = face.indices();
                 if face_indices.len() == 3 {
-                    indices.extend_from_slice(face_indices);
+                    raw_indices.extend_from_slice(face_indices);
                 }
             }
 
-            let mut faces = Vec::with_capacity(indices.len() / 3);
-            for i in (0..indices.len()).step_by(3) {
-                let i0 = indices[i];
-                let i1 = indices[i + 1];
-                let i2 = indices[i + 2];
+            let mut faces = Vec::with_capacity(raw_indices.len() / 3);
+            for i in (0..raw_indices.len()).step_by(3) {
+                let i0 = raw_indices[i];
+                let i1 = raw_indices[i + 1];
+                let i2 = raw_indices[i + 2];
+
                 let p0 = vertices[i0 as usize];
                 let p1 = vertices[i1 as usize];
                 let p2 = vertices[i2 as usize];
@@ -295,22 +353,19 @@ impl TriMesh {
 
             let bvh_root = TriBvhNode::build(&mut faces, 0);
 
-            let mut new_indices = Vec::with_capacity(indices.len());
-            for face in faces {
-                new_indices.push(face.i0);
-                new_indices.push(face.i1);
-                new_indices.push(face.i2);
-            }
+            let indices: Vec<u32> = faces.iter().flat_map(|f| [f.i0, f.i1, f.i2]).collect();
+
+            let material = loaded_materials
+                .get(mesh.material_index())
+                .cloned()
+                .unwrap_or_else(|| default_mat.clone());
 
             meshes.push(TriMesh {
                 vertices,
                 normals,
                 uvs,
-                indices: new_indices,
-                material: loaded_materials
-                    .get(mesh.material_index())
-                    .cloned()
-                    .unwrap_or(default_mat.clone()),
+                indices,
+                material,
                 smooth_normals,
                 transform: Transform::default(),
                 bvh_root,
@@ -343,6 +398,8 @@ impl Hittable for TriMesh {
     fn bounding_box(&self) -> Aabb {
         self.bvh_root.bbox.transform(&self.transform)
     }
-    
-    fn as_any(&self) -> &dyn std::any::Any { self }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }

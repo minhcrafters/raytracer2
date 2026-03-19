@@ -1,22 +1,17 @@
 use bytemuck::{Pod, Zeroable};
 
-// ─── Material types (tag values) ───
 pub const MAT_LAMBERTIAN: u32 = 0;
 pub const MAT_METALLIC: u32 = 1;
 pub const MAT_DIELECTRIC: u32 = 2;
 pub const MAT_DIFFUSE_LIGHT: u32 = 3;
 pub const MAT_SPECULAR: u32 = 4;
 
-// ─── Primitive types (tag values) ───
 pub const PRIM_SPHERE: u32 = 0;
 pub const PRIM_QUAD: u32 = 1;
 pub const PRIM_TRIANGLE: u32 = 2;
 
-// ─── Background types ───
 pub const BG_COLOR: u32 = 0;
 pub const BG_HDRI: u32 = 1;
-
-// ─── GPU structs (all #[repr(C)], Pod, Zeroable for safe casting) ───
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -32,13 +27,13 @@ pub struct GpuCamera {
     pub defocus_angle: f32,
     pub current_sample: u32,
     pub bg_type: u32,
-    pub _pad0: u32,          // ensures bg_color is 16-byte aligned
+    pub _pad0: u32, // ensures bg_color is 16-byte aligned
     pub bg_color: [f32; 3],
     pub hdri_width: u32,
     pub hdri_height: u32,
     pub _pad1: u32,
     pub _pad2: u32,
-    pub _pad3: u32,          // final padding for 16-byte alignment
+    pub _pad3: u32, // final padding for 16-byte alignment
 }
 
 #[repr(C)]
@@ -51,7 +46,7 @@ pub struct GpuMaterial {
     pub emit: [f32; 3],
     pub fuzz: f32,
     pub shininess: f32,
-    // For texture-based materials:
+    // for texture-based materials
     pub has_texture: u32,
     pub tex_width: u32,
     pub tex_offset: u32, // offset into texture data buffer
@@ -83,7 +78,6 @@ impl Default for GpuTransform {
     }
 }
 
-/// A sphere in object space: center + radius.
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 pub struct GpuSphere {
@@ -91,7 +85,6 @@ pub struct GpuSphere {
     pub radius: f32,
 }
 
-/// A quad defined by corner point q, edge vectors u and v, and precomputed plane data.
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 pub struct GpuQuad {
@@ -107,16 +100,21 @@ pub struct GpuQuad {
     pub _pad3: f32,
 }
 
-/// A single triangle primitive.
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 pub struct GpuTriangle {
-    pub v0: [f32; 3],  pub _pad0: f32,
-    pub v1: [f32; 3],  pub _pad1: f32,
-    pub v2: [f32; 3],  pub _pad2: f32,
-    pub n0: [f32; 3],  pub _pad3: f32,
-    pub n1: [f32; 3],  pub _pad4: f32,
-    pub n2: [f32; 3],  pub _pad5: f32,
+    pub v0: [f32; 3],
+    pub _pad0: f32,
+    pub v1: [f32; 3],
+    pub _pad1: f32,
+    pub v2: [f32; 3],
+    pub _pad2: f32,
+    pub n0: [f32; 3],
+    pub _pad3: f32,
+    pub n1: [f32; 3],
+    pub _pad4: f32,
+    pub n2: [f32; 3],
+    pub _pad5: f32,
     pub uv0: [f32; 2],
     pub uv1: [f32; 2],
     pub uv2: [f32; 2],
@@ -125,18 +123,15 @@ pub struct GpuTriangle {
     pub _pad6: [u32; 4],
 }
 
-/// A primitive: tagged union with type discriminant.
-/// Data stored separately in per-type buffers; this just holds indices.
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 pub struct GpuPrimitive {
     pub prim_type: u32,
-    pub data_index: u32, // index into the sphere/quad/trimesh-header array
+    pub data_index: u32,
     pub material_index: u32,
     pub transform_index: u32,
 }
 
-/// Flattened BVH node for scene-level BVH.
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 pub struct GpuBvhNode {
@@ -148,7 +143,6 @@ pub struct GpuBvhNode {
     pub _pad: [u32; 3],
 }
 
-/// Light entry: just indices into the primitive array.
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 pub struct GpuLight {
@@ -156,9 +150,6 @@ pub struct GpuLight {
     pub _pad: [u32; 3],
 }
 
-
-
-/// HDRI pixel (linear f32 RGB).
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 pub struct GpuHdriPixel {
@@ -168,7 +159,6 @@ pub struct GpuHdriPixel {
     pub _pad: f32,
 }
 
-/// Texture pixel (sRGB u8 packed as f32).
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 pub struct GpuTexPixel {

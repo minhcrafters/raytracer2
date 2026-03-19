@@ -4,7 +4,7 @@ use crate::{
     background::Background,
     hittable::Hittable,
     image::{Color, PPMImage},
-    pdf::{HittablePdf, MixturePdf, Pdf},
+    pdf::{HittablePdf, MixturePdf, Pdf, SpherePdf},
     ray::{Ray, interval::Interval},
     utils::{random_f64, random_in_unit_disk},
 };
@@ -212,9 +212,23 @@ impl Camera {
 
             if let Some(ref material) = hit.material {
                 if let Some(srec) = material.scatter(r, &hit) {
+                    let mut attenuation = srec.attenuation;
+                    let bounces = self.max_depth - depth;
+                    if bounces > 3 {
+                        let p = attenuation
+                            .r
+                            .max(attenuation.g)
+                            .max(attenuation.b)
+                            .clamp(0.05, 1.0);
+                        if random_f64() > p {
+                            return emission;
+                        }
+                        attenuation = attenuation / p;
+                    }
+
                     if srec.skip_pdf {
                         return emission
-                            + srec.attenuation
+                            + attenuation
                                 * self.ray_color(&srec.skip_pdf_ray, depth - 1, world, lights);
                     }
 
@@ -223,19 +237,33 @@ impl Camera {
                     let scattered;
                     let pdf_val;
 
-                    if lights.is_empty() {
+                    let is_hdri = matches!(self.background, Background::Hdri(_));
+
+                    if lights.is_empty() && !is_hdri {
                         scattered = Ray::new(hit.point, material_pdf.generate(), r.time);
                         pdf_val = material_pdf.value(scattered.dir);
-                    } else {
+                    } else if lights.is_empty() && is_hdri {
+                        let sphere_pdf = SpherePdf::new();
+                        let p = MixturePdf::new(&sphere_pdf, material_pdf.as_ref());
+                        scattered = Ray::new(hit.point, p.generate(), r.time);
+                        pdf_val = p.value(scattered.dir);
+                    } else if !lights.is_empty() && !is_hdri {
                         let light_ptr = HittablePdf::new(lights, hit.point);
                         let p = MixturePdf::new(&light_ptr, material_pdf.as_ref());
+                        scattered = Ray::new(hit.point, p.generate(), r.time);
+                        pdf_val = p.value(scattered.dir);
+                    } else {
+                        let light_ptr = HittablePdf::new(lights, hit.point);
+                        let p_light_mat = MixturePdf::new(&light_ptr, material_pdf.as_ref());
+                        let sphere_pdf = SpherePdf::new();
+                        let p = MixturePdf::new(&sphere_pdf, &p_light_mat);
                         scattered = Ray::new(hit.point, p.generate(), r.time);
                         pdf_val = p.value(scattered.dir);
                     }
 
                     let scattering_pdf = material.scattering_pdf(r, &hit, &scattered);
 
-                    let scatter_color = (srec.attenuation
+                    let scatter_color = (attenuation
                         * scattering_pdf
                         * self.ray_color(&scattered, depth - 1, world, lights))
                         / pdf_val;
@@ -254,7 +282,6 @@ impl Camera {
                     if final_color.b.is_nan() {
                         final_color.b = 0.0;
                     }
-
                     return final_color;
                 }
             }
