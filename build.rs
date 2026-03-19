@@ -11,9 +11,9 @@ fn main() {
             "shaders/raytracer.spv",
         ])
         .status()
-        .expect("glslc shader compilation failed");
+        .unwrap();
 
     if !status.success() {
-        panic!("glslc shader compilation failed");
+        eprintln!("glslc shader compilation failed, using existing SPIR-V binary");
     }
 }

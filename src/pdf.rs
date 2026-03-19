@@ -1,6 +1,6 @@
 use crate::{
     hittable::Hittable,
-    utils::{random_cosine_direction, random_f64},
+    utils::{OrthonormalBasis, random_cosine_direction, random_f64},
 };
 use glam::DVec3;
 use std::f64::consts::PI;
@@ -11,13 +11,13 @@ pub trait Pdf {
 }
 
 pub struct CosinePdf {
-    uvw: crate::utils::OrthonormalBasis,
+    uvw: OrthonormalBasis,
 }
 
 impl CosinePdf {
     pub fn new(w: DVec3) -> Self {
         Self {
-            uvw: crate::utils::OrthonormalBasis::build_from_w(w),
+            uvw: OrthonormalBasis::build_from_w(w),
         }
     }
 }
@@ -28,7 +28,7 @@ impl Pdf for CosinePdf {
         if cosine_theta <= 0.0 {
             0.0
         } else {
-            cosine_theta / std::f64::consts::PI
+            cosine_theta / PI
         }
     }
 
@@ -80,5 +80,23 @@ impl<'a, 'b> Pdf for MixturePdf<'a, 'b> {
         } else {
             self.p1.generate()
         }
+    }
+}
+
+pub struct SpherePdf;
+
+impl SpherePdf {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Pdf for SpherePdf {
+    fn value(&self, _direction: DVec3) -> f64 {
+        1.0 / (4.0 * PI)
+    }
+
+    fn generate(&self) -> DVec3 {
+        crate::utils::random_unit_vec3()
     }
 }

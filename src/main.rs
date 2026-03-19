@@ -54,7 +54,7 @@ fn cornell_box() -> PPMImage {
     let green = Arc::new(Lambertian::new(Color::from_hex(0x00BC00)));
     let light_mat = Arc::new(DiffuseLight::new(Color::from_hex(0xFFFFFF) * 100.0));
 
-    let box1_mat = Arc::new(Metallic::new(Color::from_hex(0x3db5ff), 0.0));
+    let box1_mat = Arc::new(Metallic::new(Color::from_hex(0xFFFFFF), 0.0));
     let box2_mat = Arc::new(Lambertian::new(Color::new(1.0, 1.0, 1.0)));
 
     let floor_q = DVec3::new(0.0, 0.0, 0.0);
@@ -204,7 +204,7 @@ fn teapot_hdri() -> PPMImage {
 fn dragon() -> PPMImage {
     let aspect_ratio = 4.0 / 3.0;
     let image_width = 1200;
-    let spp = 500;
+    let spp = 1000;
 
     let mut camera = Camera::new(aspect_ratio, image_width, spp, 50);
 
@@ -292,7 +292,7 @@ fn render_gpu(
 fn main() {
     env_logger::init();
 
-    let image = cornell_box();
+    let image = dragon();
 
     image.save("output.ppm").expect("Failed to save image");
 

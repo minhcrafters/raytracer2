@@ -740,9 +740,38 @@ vec3 trace_path(Ray initial_ray) {
             vec3 scattered_dir;
             float pdf_val;
 
-            if (light_count > 0u) {
-                // 50% light 50% material
+            bool is_hdri = (camera.bg_type == BG_HDRI);
+            bool has_lights = (light_count > 0u);
+
+            if (!has_lights && !is_hdri) {
+                scattered_dir = sr.scattered_dir;
+                float cosine_pdf = dot(rec.normal, normalize(scattered_dir));
+                pdf_val = cosine_pdf > 0.0 ? cosine_pdf / PI : 0.0;
+            } else if (!has_lights && is_hdri) {
                 if (rand_f() < 0.5) {
+                    scattered_dir = normalize(rand_unit_vec3());
+                } else {
+                    scattered_dir = sr.scattered_dir;
+                }
+                float cosine_pdf = dot(rec.normal, normalize(scattered_dir));
+                cosine_pdf = cosine_pdf > 0.0 ? cosine_pdf / PI : 0.0;
+                float sphere_pdf = 1.0 / (4.0 * PI);
+                pdf_val = 0.5 * sphere_pdf + 0.5 * cosine_pdf;
+            } else if (has_lights && !is_hdri) {
+                if (rand_f() < 0.5) {
+                    scattered_dir = normalize(lights_random(rec.point));
+                } else {
+                    scattered_dir = sr.scattered_dir;
+                }
+                float cosine_pdf = dot(rec.normal, normalize(scattered_dir));
+                cosine_pdf = cosine_pdf > 0.0 ? cosine_pdf / PI : 0.0;
+                float light_pdf = lights_pdf_value(rec.point, scattered_dir);
+                pdf_val = 0.5 * light_pdf + 0.5 * cosine_pdf;
+            } else {
+                float r = rand_f();
+                if (r < 0.5) {
+                    scattered_dir = normalize(rand_unit_vec3());
+                } else if (r < 0.75) {
                     scattered_dir = normalize(lights_random(rec.point));
                 } else {
                     scattered_dir = sr.scattered_dir;
@@ -751,11 +780,9 @@ vec3 trace_path(Ray initial_ray) {
                 float cosine_pdf = dot(rec.normal, normalize(scattered_dir));
                 cosine_pdf = cosine_pdf > 0.0 ? cosine_pdf / PI : 0.0;
                 float light_pdf = lights_pdf_value(rec.point, scattered_dir);
-                pdf_val = 0.5 * light_pdf + 0.5 * cosine_pdf;
-            } else {
-                scattered_dir = sr.scattered_dir;
-                float cosine_pdf = dot(rec.normal, normalize(scattered_dir));
-                pdf_val = cosine_pdf > 0.0 ? cosine_pdf / PI : 0.0;
+                float sphere_pdf = 1.0 / (4.0 * PI);
+                float p_light_mat = 0.5 * light_pdf + 0.5 * cosine_pdf;
+                pdf_val = 0.5 * sphere_pdf + 0.5 * p_light_mat;
             }
 
             if (pdf_val < 1e-10) break;
@@ -770,6 +797,15 @@ vec3 trace_path(Ray initial_ray) {
             if (any(isnan(throughput))) throughput = vec3(0.0);
 
             current_ray = make_ray(rec.point, scattered_dir);
+        }
+
+        if (depth >= 3u) {
+            float p = max(throughput.x, max(throughput.y, throughput.z));
+            p = clamp(p, 0.05, 1.0);
+            if (rand_f() > p) {
+                break;
+            }
+            throughput *= 1.0 / p;
         }
     }
 
