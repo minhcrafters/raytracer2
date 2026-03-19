@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use wgpu;
 
 pub struct GpuContext {
     pub device: Arc<wgpu::Device>,
@@ -13,7 +12,7 @@ impl GpuContext {
 
     async fn init_async() -> Self {
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::VULKAN | wgpu::Backends::DX12,
+            backends: wgpu::Backends::PRIMARY,
             ..Default::default()
         });
 
@@ -28,15 +27,13 @@ impl GpuContext {
         println!("Using GPU: {}", adapter.get_info().name);
 
         let mut limits = wgpu::Limits::default();
-        limits.max_storage_buffer_binding_size = adapter.limits().max_storage_buffer_binding_size;
-        limits.max_buffer_size = adapter.limits().max_buffer_size;
-        limits.max_storage_buffers_per_shader_stage = 18;
-        limits.max_bind_groups = 1;
+        // limits.max_storage_buffer_binding_size = adapter.limits().max_storage_buffer_binding_size;
+        // limits.max_buffer_size = adapter.limits().max_buffer_size;
+        limits.max_storage_buffers_per_shader_stage = 12;
 
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("Raytracer Device"),
-                required_features: wgpu::Features::empty(),
                 required_limits: limits,
                 memory_hints: wgpu::MemoryHints::Performance,
                 ..Default::default()

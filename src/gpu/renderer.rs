@@ -28,13 +28,9 @@ impl GpuRenderer {
     pub fn new() -> Self {
         let ctx = GpuContext::new();
 
-        let shader_bytes = include_bytes!("../../shaders/raytracer.spv");
         let shader_module = ctx
             .device
-            .create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: Some("Raytracer Shader"),
-                source: wgpu::util::make_spirv(shader_bytes),
-            });
+            .create_shader_module(wgpu::include_spirv!("../../shaders/raytracer.spv"));
 
         let bind_group_layout =
             ctx.device

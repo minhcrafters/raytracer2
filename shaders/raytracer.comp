@@ -704,7 +704,7 @@ float hable_op(float x) {
 
 float tonemap(float lin) {
     if (lin > 0.0) {
-        float exposure_bias = 2.0;
+        float exposure_bias = 2.5;
         float curr = hable_op(lin * exposure_bias);
         float white_scale = 1.0 / hable_op(11.2);
         float color = curr * white_scale;

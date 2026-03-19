@@ -292,7 +292,7 @@ fn render_gpu(
 fn main() {
     env_logger::init();
 
-    let image = dragon();
+    let image = cornell_box();
 
     image.save("output.ppm").expect("Failed to save image");
 
