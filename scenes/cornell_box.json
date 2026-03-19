@@ -1,0 +1,203 @@
+{
+    "render": {
+        "aspect_ratio": 1.0,
+        "image_width": 800,
+        "spp": 500,
+        "max_depth": 50,
+        "output": "cornell_box"
+    },
+
+    "camera": {
+        "fov": 39.6,
+        "look_from": [278.0, 273.0, -800.0],
+        "look_at": [278.0, 273.0, 0.0],
+        "vup": [0.0, 1.0, 0.0],
+        "defocus_angle": 0.0
+    },
+
+    "background": {
+        "type": "color",
+        "color": [0.0, 0.0, 0.0]
+    },
+
+    "materials": {
+        "white": {
+            "type": "lambertian",
+            "albedo": [0.73, 0.73, 0.73]
+        },
+        "red": {
+            "type": "lambertian",
+            "albedo": [0.65, 0.05, 0.05]
+        },
+        "green": {
+            "type": "lambertian",
+            "albedo": [0.12, 0.45, 0.15]
+        },
+
+        "mirror": {
+            "type": "metallic",
+            "albedo": [0.95, 0.95, 0.95],
+            "fuzz": 0.0
+        },
+        "brushed_gold": {
+            "type": "metallic",
+            "albedo": [1.0, 0.766, 0.336],
+            "fuzz": 0.25
+        },
+
+        "glass": {
+            "type": "dielectric",
+            "color": [1.0, 1.0, 1.0],
+            "ior": 1.5,
+            "roughness": 0.0
+        },
+        "tinted_glass": {
+            "type": "dielectric",
+            "color": [0.8, 0.95, 0.85],
+            "ior": 1.45,
+            "roughness": 0.02
+        },
+
+        "chrome": {
+            "type": "specular",
+            "color": [0.78, 0.78, 0.82],
+            "ior": 2.5,
+            "shininess": 8000.0
+        },
+
+        "area_light": {
+            "type": "diffuse_light",
+            "emit": [15.0, 15.0, 15.0]
+        }
+    },
+
+    "objects": [
+        {
+            "id": "floor",
+            "type": "quad",
+            "material": "white",
+            "q": [0.0, 0.0, 0.0],
+            "u": [556.0, 0.0, 0.0],
+            "v": [0.0, 0.0, 559.2]
+        },
+        {
+            "id": "ceiling",
+            "type": "quad",
+            "material": "white",
+            "q": [0.0, 548.9, 0.0],
+            "u": [556.0, 0.0, 0.0],
+            "v": [0.0, 0.0, 559.2]
+        },
+        {
+            "id": "back_wall",
+            "type": "quad",
+            "material": "white",
+            "q": [0.0, 0.0, 559.2],
+            "u": [556.0, 0.0, 0.0],
+            "v": [0.0, 548.9, 0.0]
+        },
+        {
+            "id": "left_wall",
+            "type": "quad",
+            "material": "red",
+            "q": [556.0, 0.0, 0.0],
+            "u": [0.0, 0.0, 559.2],
+            "v": [0.0, 548.9, 0.0]
+        },
+        {
+            "id": "right_wall",
+            "type": "quad",
+            "material": "green",
+            "q": [0.0, 0.0, 0.0],
+            "u": [0.0, 0.0, 559.2],
+            "v": [0.0, 548.9, 0.0]
+        },
+
+        {
+            "id": "ceiling_light",
+            "type": "quad",
+            "material": "area_light",
+            "q": [213.0, 548.8, 227.0],
+            "u": [130.0, 0.0, 0.0],
+            "v": [0.0, 0.0, 105.0]
+        },
+
+        {
+            "id": "picture_frame",
+            "type": "quad",
+            "material": "brushed_gold",
+            "transforms": [
+                { "type": "scale", "value": [100.0, 1.0, 70.0] },
+                { "type": "rotate", "value": [-90.0, 0.0, 0.0] },
+                { "type": "translate", "value": [278.0, 300.0, 557.5] }
+            ]
+        },
+
+        {
+            "id": "mirror_sphere",
+            "type": "sphere",
+            "material": "mirror",
+            "transforms": [
+                { "type": "scale", "value": [90.0, 90.0, 90.0] },
+                { "type": "translate", "value": [186.0, 90.0, 169.0] }
+            ]
+        },
+        {
+            "id": "glass_sphere",
+            "type": "sphere",
+            "material": "glass",
+            "transforms": [
+                { "type": "scale", "value": [80.0, 80.0, 80.0] },
+                { "type": "translate", "value": [370.0, 80.0, 378.0] }
+            ]
+        },
+
+        {
+            "id": "short_box",
+            "type": "cuboid",
+            "material": "brushed_gold",
+            "min": [-0.5, 0.0, -0.5],
+            "max": [0.5, 1.0, 0.5],
+            "transforms": [
+                { "type": "scale", "value": [165.0, 165.0, 165.0] },
+                { "type": "rotate", "value": [0.0, 18.0, 0.0] },
+                { "type": "translate", "value": [186.0, 0.0, 351.0] }
+            ]
+        },
+        {
+            "id": "tall_box",
+            "type": "cuboid",
+            "material": "chrome",
+            "min": [-0.5, 0.0, -0.5],
+            "max": [0.5, 1.0, 0.5],
+            "transforms": [
+                { "type": "scale", "value": [165.0, 330.0, 165.0] },
+                { "type": "rotate", "value": [0.0, -15.0, 0.0] },
+                { "type": "translate", "value": [368.0, 0.0, 351.0] }
+            ]
+        },
+
+        {
+            "id": "decorative_triangle",
+            "type": "triangle",
+            "material": "tinted_glass",
+            "a": [278.0, 380.0, 280.0],
+            "b": [228.0, 280.0, 280.0],
+            "c": [328.0, 280.0, 280.0]
+        },
+
+        {
+            "id": "teapot",
+            "type": "trimesh",
+            "material": "glass",
+            "path": "obj/teapot.obj",
+            "recompute_normals": true,
+            "transforms": [
+                { "type": "scale", "value": [50.0, 50.0, 50.0] },
+                { "type": "translate", "value": [278.0, 0.0, 278.0] }
+            ]
+        }
+    ],
+
+    "lights": ["ceiling_light"]
+}

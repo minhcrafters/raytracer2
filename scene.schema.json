@@ -1,0 +1,310 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/minhcrafters/raytracer2/blob/gpu/scene.schema.json",
+    "title": "Scene Configuration Schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["camera", "background", "materials", "objects"],
+    "properties": {
+        "render": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["aspect_ratio", "image_width", "spp", "max_depth", "output"],
+            "properties": {
+                "aspect_ratio": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                },
+                "image_width": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "spp": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "max_depth": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "output": {
+                    "type": "string",
+                    "minLength": 1
+                }
+            }
+        },
+
+        "camera": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["fov", "look_from", "look_at", "vup", "defocus_angle"],
+            "properties": {
+                "fov": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "exclusiveMaximum": 180
+                },
+                "look_from": { "$ref": "#/$defs/vec3" },
+                "look_at": { "$ref": "#/$defs/vec3" },
+                "vup": { "$ref": "#/$defs/vec3" },
+                "defocus_angle": {
+                    "type": "number",
+                    "minimum": 0
+                }
+            }
+        },
+
+        "background": {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["type", "color"],
+                    "properties": {
+                        "type": { "const": "color" },
+                        "color": { "$ref": "#/$defs/color" }
+                    }
+                },
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["type", "path"],
+                    "properties": {
+                        "type": { "const": "hdri" },
+                        "path": { "type": "string", "minLength": 1 }
+                    }
+                }
+            ]
+        },
+
+        "materials": {
+            "type": "object",
+            "patternProperties": {
+                "^[A-Za-z_][A-Za-z0-9_-]*$": {
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "required": ["type", "albedo"],
+                            "additionalProperties": false,
+                            "properties": {
+                                "type": { "const": "lambertian" },
+                                "albedo": { "$ref": "#/$defs/color" }
+                            }
+                        },
+                        {
+                            "type": "object",
+                            "required": ["type", "albedo", "fuzz"],
+                            "additionalProperties": false,
+                            "properties": {
+                                "type": { "const": "metallic" },
+                                "albedo": { "$ref": "#/$defs/color" },
+                                "fuzz": { "type": "number", "minimum": 0 }
+                            }
+                        },
+                        {
+                            "type": "object",
+                            "required": ["type", "color", "ior", "roughness"],
+                            "additionalProperties": false,
+                            "properties": {
+                                "type": { "const": "dielectric" },
+                                "color": { "$ref": "#/$defs/color" },
+                                "ior": { "type": "number", "exclusiveMinimum": 0 },
+                                "roughness": { "type": "number", "minimum": 0 }
+                            }
+                        },
+                        {
+                            "type": "object",
+                            "required": ["type", "color", "ior", "shininess"],
+                            "additionalProperties": false,
+                            "properties": {
+                                "type": { "const": "specular" },
+                                "color": { "$ref": "#/$defs/color" },
+                                "ior": { "type": "number", "exclusiveMinimum": 0 },
+                                "shininess": { "type": "number", "exclusiveMinimum": 0 }
+                            }
+                        },
+                        {
+                            "type": "object",
+                            "required": ["type", "emit"],
+                            "additionalProperties": false,
+                            "properties": {
+                                "type": { "const": "diffuse_light" },
+                                "emit": { "$ref": "#/$defs/color" }
+                            }
+                        }
+                    ]
+                }
+            },
+            "additionalProperties": false
+        },
+
+        "objects": {
+            "type": "array",
+            "items": {
+                "oneOf": [
+                    { "$ref": "#/$defs/sphereObject" },
+                    { "$ref": "#/$defs/quadObject" },
+                    { "$ref": "#/$defs/cuboidObject" },
+                    { "$ref": "#/$defs/triangleObject" },
+                    { "$ref": "#/$defs/trimeshObject" }
+                ]
+            }
+        },
+
+        "lights": {
+            "type": "array",
+            "items": { "type": "string" },
+            "uniqueItems": true
+        }
+    },
+
+    "$defs": {
+        "vec3": {
+            "type": "array",
+            "items": { "type": "number" },
+            "minItems": 3,
+            "maxItems": 3
+        },
+
+        "color": {
+            "type": "array",
+            "items": { "type": "number" },
+            "minItems": 3,
+            "maxItems": 3
+        },
+
+        "transformOp": {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["type", "value"],
+                    "properties": {
+                        "type": { "const": "scale" },
+                        "value": { "$ref": "#/$defs/vec3" }
+                    }
+                },
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["type", "value"],
+                    "properties": {
+                        "type": { "const": "rotate" },
+                        "value": {
+                            "description": "Euler rotation [x, y, z] in degrees.",
+                            "$ref": "#/$defs/vec3"
+                        }
+                    }
+                },
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["type", "value"],
+                    "properties": {
+                        "type": { "const": "translate" },
+                        "value": { "$ref": "#/$defs/vec3" }
+                    }
+                }
+            ]
+        },
+
+        "objectBase": {
+            "type": "object",
+            "required": ["id", "type"],
+            "additionalProperties": false,
+            "properties": {
+                "id": { "type": "string" },
+                "type": { "type": "string" },
+                "material": { "type": "string" },
+                "transforms": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/transformOp" }
+                }
+            }
+        },
+
+        "sphereObject": {
+            "allOf": [
+                { "$ref": "#/$defs/objectBase" },
+                {
+                    "properties": {
+                        "type": { "const": "sphere" }
+                    }
+                }
+            ]
+        },
+
+        "quadObject": {
+            "oneOf": [
+                {
+                    "allOf": [
+                        { "$ref": "#/$defs/objectBase" },
+                        {
+                            "required": ["type", "q", "u", "v", "material"],
+                            "properties": {
+                                "type": { "const": "quad" },
+                                "q": { "$ref": "#/$defs/vec3" },
+                                "u": { "$ref": "#/$defs/vec3" },
+                                "v": { "$ref": "#/$defs/vec3" }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "allOf": [
+                        { "$ref": "#/$defs/objectBase" },
+                        {
+                            "required": ["type", "material", "transforms"],
+                            "properties": {
+                                "type": { "const": "quad" }
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+
+        "cuboidObject": {
+            "allOf": [
+                { "$ref": "#/$defs/objectBase" },
+                {
+                    "required": ["type", "min", "max", "material"],
+                    "properties": {
+                        "type": { "const": "cuboid" },
+                        "min": { "$ref": "#/$defs/vec3" },
+                        "max": { "$ref": "#/$defs/vec3" }
+                    }
+                }
+            ]
+        },
+
+        "triangleObject": {
+            "allOf": [
+                { "$ref": "#/$defs/objectBase" },
+                {
+                    "required": ["type", "a", "b", "c", "material"],
+                    "properties": {
+                        "type": { "const": "triangle" },
+                        "a": { "$ref": "#/$defs/vec3" },
+                        "b": { "$ref": "#/$defs/vec3" },
+                        "c": { "$ref": "#/$defs/vec3" }
+                    }
+                }
+            ]
+        },
+
+        "trimeshObject": {
+            "allOf": [
+                { "$ref": "#/$defs/objectBase" },
+                {
+                    "required": ["type", "path", "material"],
+                    "properties": {
+                        "type": { "const": "trimesh" },
+                        "path": { "type": "string" },
+                        "recompute_normals": { "type": "boolean" }
+                    }
+                }
+            ]
+        }
+    }
+}

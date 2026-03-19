@@ -1,0 +1,86 @@
+{
+    "render": {
+        "aspect_ratio": 1.3333333333333333,
+        "image_width": 1200,
+        "spp": 500,
+        "max_depth": 50,
+        "output": "dragon"
+    },
+
+    "camera": {
+        "fov": 22.0,
+        "look_from": [-2.5, 4.0, 6.5],
+        "look_at": [0.0, 0.0, 0.0],
+        "vup": [0.0, 1.0, 0.0],
+        "defocus_angle": 0.0
+    },
+
+    "background": {
+        "type": "color",
+        "color": [0.01, 0.01, 0.01]
+    },
+
+    "materials": {
+        "white": {
+            "type": "lambertian",
+            "albedo": [0.6667, 0.6667, 0.6667]
+        },
+        "key_light": {
+            "type": "diffuse_light",
+            "emit": [320.0, 320.0, 320.0]
+        },
+        "fill_light": {
+            "type": "diffuse_light",
+            "emit": [800.0, 533.3333, 533.3333]
+        },
+        "dragon_mat": {
+            "type": "specular",
+            "color": [0.6353, 0.7882, 0.1098],
+            "ior": 1.5,
+            "shininess": 10000.0
+        }
+    },
+
+    "objects": [
+        {
+            "id": "floor",
+            "type": "quad",
+            "material": "white",
+            "transforms": [
+                { "type": "scale", "value": [50.0, 1.0, 50.0] },
+                { "type": "translate", "value": [0.0, -1.0, 0.0] }
+            ]
+        },
+        {
+            "id": "key_light_sphere",
+            "type": "sphere",
+            "material": "key_light",
+            "transforms": [
+                { "type": "scale", "value": [2.0, 2.0, 2.0] },
+                { "type": "translate", "value": [0.0, 20.0, 3.0] }
+            ]
+        },
+        {
+            "id": "fill_light_sphere",
+            "type": "sphere",
+            "material": "fill_light",
+            "transforms": [
+                { "type": "scale", "value": [0.05, 0.05, 0.05] },
+                { "type": "translate", "value": [-1.0, 0.71, 0.0] }
+            ]
+        },
+        {
+            "id": "dragon",
+            "type": "trimesh",
+            "material": "dragon_mat",
+            "path": "obj/dragon.obj",
+            "recompute_normals": true,
+            "transforms": [
+                { "type": "scale", "value": [3.4, 3.4, 3.4] },
+                { "type": "rotate", "value": [0.0, 90.0, 0.0] }
+            ]
+        }
+    ],
+
+    "lights": ["key_light_sphere", "fill_light_sphere"]
+}

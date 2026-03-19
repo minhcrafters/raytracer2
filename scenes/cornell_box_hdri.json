@@ -1,0 +1,126 @@
+{
+    "render": {
+        "aspect_ratio": 1.0,
+        "image_width": 1024,
+        "spp": 500,
+        "max_depth": 50,
+        "output": "cornell_box_hdri"
+    },
+
+    "camera": {
+        "fov": 39.305,
+        "look_from": [278.0, 273.0, -800.0],
+        "look_at": [278.0, 273.0, -799.0],
+        "vup": [0.0, 1.0, 0.0],
+        "defocus_angle": 0.0
+    },
+
+    "background": {
+        "type": "hdri",
+        "path": "hdri/german_town_street_4k.hdr"
+    },
+
+    "materials": {
+        "white": {
+            "type": "lambertian",
+            "albedo": [0.6667, 0.6667, 0.6667]
+        },
+        "red": {
+            "type": "lambertian",
+            "albedo": [0.7373, 0.0, 0.0]
+        },
+        "green": {
+            "type": "lambertian",
+            "albedo": [0.0, 0.7373, 0.0]
+        },
+        "ceiling_light": {
+            "type": "diffuse_light",
+            "emit": [100.0, 100.0, 100.0]
+        },
+        "mirror": {
+            "type": "metallic",
+            "albedo": [1.0, 1.0, 1.0],
+            "fuzz": 0.0
+        },
+        "diffuse_white": {
+            "type": "lambertian",
+            "albedo": [1.0, 1.0, 1.0]
+        }
+    },
+
+    "objects": [
+        {
+            "id": "floor",
+            "type": "quad",
+            "material": "white",
+            "q": [0.0, 0.0, 0.0],
+            "u": [556.0, 0.0, 0.0],
+            "v": [0.0, 0.0, 559.2]
+        },
+        {
+            "id": "ceiling",
+            "type": "quad",
+            "material": "white",
+            "q": [0.0, 548.9, 0.0],
+            "u": [556.0, 0.0, 0.0],
+            "v": [0.0, 0.0, 559.2]
+        },
+        {
+            "id": "back_wall",
+            "type": "quad",
+            "material": "white",
+            "q": [0.0, 0.0, 559.2],
+            "u": [556.0, 0.0, 0.0],
+            "v": [0.0, 548.9, 0.0]
+        },
+        {
+            "id": "right_wall",
+            "type": "quad",
+            "material": "green",
+            "q": [0.0, 0.0, 0.0],
+            "u": [0.0, 0.0, 559.2],
+            "v": [0.0, 548.9, 0.0]
+        },
+        {
+            "id": "left_wall",
+            "type": "quad",
+            "material": "red",
+            "q": [556.0, 0.0, 0.0],
+            "u": [0.0, 0.0, 559.2],
+            "v": [0.0, 548.9, 0.0]
+        },
+        {
+            "id": "ceiling_light",
+            "type": "quad",
+            "material": "ceiling_light",
+            "q": [213.0, 548.8, 227.0],
+            "u": [130.0, 0.0, 0.0],
+            "v": [0.0, 0.0, 105.0]
+        },
+        {
+            "id": "large_box",
+            "type": "cuboid",
+            "material": "mirror",
+            "min": [-0.5, -0.5, -0.5],
+            "max": [0.5, 0.5, 0.5],
+            "transforms": [
+                { "type": "scale", "value": [165.0, 330.0, 165.0] },
+                { "type": "rotate", "value": [0.0, -253.0, 0.0] },
+                { "type": "translate", "value": [368.0, 165.0, 351.0] }
+            ]
+        },
+        {
+            "id": "n64_logo",
+            "type": "trimesh",
+            "path": "obj/n64_logo.obj",
+            "recompute_normals": false,
+            "transforms": [
+                { "type": "scale", "value": [165.0, 165.0, 165.0] },
+                { "type": "rotate", "value": [0.0, -197.0, 0.0] },
+                { "type": "translate", "value": [185.0, 82.5, 169.0] }
+            ]
+        }
+    ],
+
+    "lights": ["ceiling_light"]
+}
