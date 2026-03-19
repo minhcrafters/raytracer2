@@ -204,14 +204,10 @@ vec3 rand_vec3_range(float mn, float mx) {
 }
 
 vec3 rand_unit_vec3() {
-    for (int i = 0; i < 100; i++) {
-        vec3 p = rand_vec3_range(-1.0, 1.0);
-        float lsq = dot(p, p);
-        if (lsq <= 1.0 && lsq > EPSILON) {
-            return normalize(p);
-        }
-    }
-    return vec3(0.0, 1.0, 0.0);
+    float z = 2.0 * rand_f() - 1.0;
+    float r = sqrt(max(0.0, 1.0 - z * z));
+    float phi = 2.0 * PI * rand_f();
+    return vec3(r * cos(phi), r * sin(phi), z);
 }
 
 vec3 rand_in_unit_disk() {
@@ -304,21 +300,24 @@ void set_face_normal(inout HitRecord rec, Ray r, vec3 outward_normal) {
 }
 
 bool aabb_hit(vec3 bmin, vec3 bmax, Ray r, float t_min, float t_max) {
-    for (int a = 0; a < 3; a++) {
-        float inv_d = r.inv_dir[a];
-        float orig = r.origin[a];
-        float t0 = (bmin[a] - orig) * inv_d;
-        float t1 = (bmax[a] - orig) * inv_d;
-        if (inv_d < 0.0) {
-            float tmp = t0;
-            t0 = t1;
-            t1 = tmp;
-        }
-        if (t0 > t_min) t_min = t0;
-        if (t1 < t_max) t_max = t1;
-        if (t_max < t_min) return false;
-    }
-    return true;
+    vec3 t0s = (bmin - r.origin) * r.inv_dir;
+    vec3 t1s = (bmax - r.origin) * r.inv_dir;
+    vec3 tsmaller = min(t0s, t1s);
+    vec3 tbigger  = max(t0s, t1s);
+    float tmin = max(t_min, max(tsmaller.x, max(tsmaller.y, tsmaller.z)));
+    float tmax = min(t_max, min(tbigger.x,  min(tbigger.y,  tbigger.z)));
+    return tmin <= tmax;
+}
+
+// returns the entry t value for ordered traversal, or INF if no hit
+float aabb_hit_t(vec3 bmin, vec3 bmax, Ray r, float t_min, float t_max) {
+    vec3 t0s = (bmin - r.origin) * r.inv_dir;
+    vec3 t1s = (bmax - r.origin) * r.inv_dir;
+    vec3 tsmaller = min(t0s, t1s);
+    vec3 tbigger  = max(t0s, t1s);
+    float tmin = max(t_min, max(tsmaller.x, max(tsmaller.y, tsmaller.z)));
+    float tmax = min(t_max, min(tbigger.x,  min(tbigger.y,  tbigger.z)));
+    return (tmin <= tmax) ? tmin : INF;
 }
 
 bool hit_sphere(uint sphere_idx, uint transform_idx, Ray r, float t_min, float t_max, inout HitRecord rec) {
@@ -454,9 +453,6 @@ bool trace_scene(Ray r, float t_min, float t_max, inout HitRecord best_rec) {
         uint node_idx = stack[--sp];
         GpuBvhNode node = bvh_nodes[node_idx];
 
-        if (!aabb_hit(node.bbox_min, node.bbox_max, r, t_min, closest))
-            continue;
-
         if (node.is_leaf != 0u) {
             for (uint i = 0; i < node.right_or_count; i++) {
                 uint prim_idx = node.left_or_prim + i;
@@ -481,9 +477,21 @@ bool trace_scene(Ray r, float t_min, float t_max, inout HitRecord best_rec) {
                 }
             }
         } else {
-            if (sp < 62) {
-                stack[sp++] = node.left_or_prim; // left child
-                stack[sp++] = node.right_or_count; // right child
+            // ordered traversal: test both children, push far child first
+            // so near child is popped and processed first
+            uint left_idx  = node.left_or_prim;
+            uint right_idx = node.right_or_count;
+
+            float t_left  = aabb_hit_t(bvh_nodes[left_idx].bbox_min,  bvh_nodes[left_idx].bbox_max,  r, t_min, closest);
+            float t_right = aabb_hit_t(bvh_nodes[right_idx].bbox_min, bvh_nodes[right_idx].bbox_max, r, t_min, closest);
+
+            // push far child first (will be processed second)
+            if (t_left < t_right) {
+                if (t_right < INF && sp < 63) stack[sp++] = right_idx;
+                if (t_left  < INF && sp < 63) stack[sp++] = left_idx;
+            } else {
+                if (t_left  < INF && sp < 63) stack[sp++] = left_idx;
+                if (t_right < INF && sp < 63) stack[sp++] = right_idx;
             }
         }
     }
@@ -803,6 +811,14 @@ vec3 trace_path(Ray initial_ray) {
             scattering_pdf = scattering_pdf > 0.0 ? scattering_pdf / PI : 0.0;
 
             throughput *= sr.attenuation * scattering_pdf / pdf_val;
+
+            // clamp throughput per-bounce to prevent fireflies from
+            // extreme scattering_pdf/pdf_val ratios (especially with HDRI
+            // uniform sphere sampling where pdf ≈ 1/(4π) is very low)
+            float max_tp = max(throughput.x, max(throughput.y, throughput.z));
+            if (max_tp > 10.0) {
+                throughput *= 10.0 / max_tp;
+            }
 
             current_ray = make_ray(rec.point, scattered_dir);
         }

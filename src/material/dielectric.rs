@@ -4,7 +4,7 @@ use crate::{
     image::Color,
     material::{Material, ScatterRecord},
     ray::Ray,
-    utils::{random_f64, random_unit_vec3, random_vec3},
+    utils::{random_f64, random_unit_vec3},
 };
 
 use crate::hittable::HitRecord;

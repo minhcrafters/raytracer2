@@ -151,7 +151,7 @@
             "max": [0.5, 1.0, 0.5],
             "transforms": [
                 { "type": "scale", "value": [165.0, 165.0, 165.0] },
-                { "type": "rotate", "value": [0.0, 18.0, 0.0] },
+                { "type": "rotate", "value": [0.0, -18.0, 0.0] },
                 { "type": "translate", "value": [186.0, 0.0, 351.0] }
             ]
         },
@@ -163,7 +163,7 @@
             "max": [0.5, 1.0, 0.5],
             "transforms": [
                 { "type": "scale", "value": [165.0, 330.0, 165.0] },
-                { "type": "rotate", "value": [0.0, -15.0, 0.0] },
+                { "type": "rotate", "value": [0.0, 15.0, 0.0] },
                 { "type": "translate", "value": [368.0, 0.0, 351.0] }
             ]
         },

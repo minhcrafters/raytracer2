@@ -4,6 +4,8 @@ use crate::gpu::buffers::*;
 use crate::gpu::context::GpuContext;
 use crate::image::PPMImage;
 
+const BATCH_SIZE: u32 = 32;
+
 pub struct SceneBuffers {
     pub camera: GpuCamera,
     pub materials: Vec<GpuMaterial>,
@@ -243,7 +245,6 @@ impl GpuRenderer {
         let workgroups_x = (width + 7) / 8;
         let workgroups_y = (height + 7) / 8;
 
-        // One sample per dispatch
         for sample in 0..spp {
             let mut cam = scene.camera;
             cam.current_sample = sample;
@@ -266,14 +267,17 @@ impl GpuRenderer {
             }
 
             let submit_idx = queue.submit(std::iter::once(encoder.finish()));
-            let _ = device.poll(wgpu::PollType::Wait {
-                submission_index: Some(submit_idx),
-                timeout: None,
-            });
 
-            print!("\rSample {}/{} ", sample + 1, spp);
-            use std::io::Write;
-            let _ = std::io::stdout().flush();
+            if (sample + 1) % BATCH_SIZE == 0 || sample == spp - 1 {
+                let _ = device.poll(wgpu::PollType::Wait {
+                    submission_index: Some(submit_idx),
+                    timeout: None,
+                });
+
+                print!("\rSample {}/{}", sample + 1, spp);
+                use std::io::Write;
+                let _ = std::io::stdout().flush();
+            }
         }
         println!();
 

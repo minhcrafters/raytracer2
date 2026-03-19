@@ -44,6 +44,11 @@ struct Face {
 }
 
 impl TriBvhNode {
+    const NUM_SAH_BINS: usize = 12;
+    const TRAVERSAL_COST: f64 = 1.0;
+    const INTERSECT_COST: f64 = 1.0;
+    const MAX_LEAF_TRIS: usize = 4;
+
     fn build(faces: &mut [Face], start_idx: usize) -> Self {
         let mut bbox = Aabb::default();
         for face in faces.iter() {
@@ -51,7 +56,7 @@ impl TriBvhNode {
         }
 
         let num_tris = faces.len();
-        if num_tris <= 4 {
+        if num_tris <= Self::MAX_LEAF_TRIS {
             return Self {
                 bbox,
                 left: None,
@@ -61,25 +66,109 @@ impl TriBvhNode {
             };
         }
 
-        let x_size = bbox.x.size();
-        let y_size = bbox.y.size();
-        let z_size = bbox.z.size();
+        let parent_sa = surface_area(&bbox);
+        let leaf_cost = Self::INTERSECT_COST * num_tris as f64;
 
-        let axis = if y_size > x_size && y_size > z_size {
-            1
-        } else if z_size > x_size && z_size > y_size {
-            2
-        } else {
-            0
-        };
+        let mut best_cost = f64::INFINITY;
+        let mut best_axis = 0usize;
+        let mut best_split = 0usize;
+
+        for axis in 0..3 {
+            let axis_size = bbox.axis(axis).size();
+            if axis_size < 1e-10 {
+                continue;
+            }
+            let axis_min = bbox.axis(axis).min;
+
+            let mut bins_count = [0usize; Self::NUM_SAH_BINS];
+            let mut bins_bbox = [Aabb::default(); Self::NUM_SAH_BINS];
+
+            for face in faces.iter() {
+                let bin = ((face.centroid[axis] - axis_min) / axis_size
+                    * Self::NUM_SAH_BINS as f64) as usize;
+                let bin = bin.min(Self::NUM_SAH_BINS - 1);
+                bins_count[bin] += 1;
+                bins_bbox[bin] = Aabb::from_aabbs(&bins_bbox[bin], &face.bbox);
+            }
+
+            // left sweep
+            let mut left_count = [0usize; Self::NUM_SAH_BINS - 1];
+            let mut left_area = [0.0f64; Self::NUM_SAH_BINS - 1];
+            let mut running_bbox = Aabb::default();
+            let mut running_count = 0usize;
+            for i in 0..(Self::NUM_SAH_BINS - 1) {
+                running_count += bins_count[i];
+                running_bbox = Aabb::from_aabbs(&running_bbox, &bins_bbox[i]);
+                left_count[i] = running_count;
+                left_area[i] = surface_area(&running_bbox);
+            }
+
+            // right sweep
+            let mut right_count = [0usize; Self::NUM_SAH_BINS - 1];
+            let mut right_area = [0.0f64; Self::NUM_SAH_BINS - 1];
+            running_bbox = Aabb::default();
+            running_count = 0;
+            for i in (0..(Self::NUM_SAH_BINS - 1)).rev() {
+                running_count += bins_count[i + 1];
+                running_bbox = Aabb::from_aabbs(&running_bbox, &bins_bbox[i + 1]);
+                right_count[i] = running_count;
+                right_area[i] = surface_area(&running_bbox);
+            }
+
+            for i in 0..(Self::NUM_SAH_BINS - 1) {
+                if left_count[i] == 0 || right_count[i] == 0 {
+                    continue;
+                }
+                let cost = Self::TRAVERSAL_COST
+                    + Self::INTERSECT_COST
+                        * (left_count[i] as f64 * left_area[i]
+                            + right_count[i] as f64 * right_area[i])
+                        / parent_sa;
+                if cost < best_cost {
+                    best_cost = cost;
+                    best_axis = axis;
+                    best_split = i;
+                }
+            }
+        }
+
+        // fall back to midpoint split when SAH finds no improvement
+        if best_cost >= leaf_cost {
+            let axis = best_axis;
+            faces.sort_by(|a, b| {
+                a.centroid[axis]
+                    .partial_cmp(&b.centroid[axis])
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            let mid = num_tris / 2;
+            let (left_faces, right_faces) = faces.split_at_mut(mid);
+            return Self {
+                bbox,
+                left: Some(Box::new(Self::build(left_faces, start_idx))),
+                right: Some(Box::new(Self::build(right_faces, start_idx + mid))),
+                start_tri: 0,
+                tri_count: 0,
+            };
+        }
+
+        // partition by the chosen split plane
+        let axis_min = bbox.axis(best_axis).min;
+        let axis_size = bbox.axis(best_axis).size();
+        let split_pos =
+            axis_min + (best_split as f64 + 1.0) / Self::NUM_SAH_BINS as f64 * axis_size;
 
         faces.sort_by(|a, b| {
-            a.centroid[axis]
-                .partial_cmp(&b.centroid[axis])
+            a.centroid[best_axis]
+                .partial_cmp(&b.centroid[best_axis])
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
-        let mid = num_tris / 2;
+        let mid = faces
+            .iter()
+            .position(|f| f.centroid[best_axis] >= split_pos)
+            .unwrap_or(num_tris / 2)
+            .clamp(1, num_tris - 1);
+
         let (left_faces, right_faces) = faces.split_at_mut(mid);
 
         Self {
@@ -163,7 +252,7 @@ impl TriBvhNode {
                     hit_record = Some(HitRecord {
                         point: intersection_obj,
                         normal: normal_obj,
-                        material: Some(mesh.material.clone()),
+                        material: None,
                         t,
                         u: tex_u,
                         v: tex_v,
@@ -190,6 +279,13 @@ impl TriBvhNode {
 
         hit_right.or(hit_left)
     }
+}
+
+fn surface_area(bbox: &Aabb) -> f64 {
+    let dx = bbox.x.size().max(0.0);
+    let dy = bbox.y.size().max(0.0);
+    let dz = bbox.z.size().max(0.0);
+    2.0 * (dx * dy + dy * dz + dz * dx)
 }
 
 fn convert_material(
@@ -395,6 +491,7 @@ impl Hittable for TriMesh {
             let normal_world = self.transform.transform_normal(rec.normal);
             rec.point = self.transform.transform_point(rec.point);
             rec.normal = normal_world;
+            rec.material = Some(self.material.clone());
             rec.set_face_normal(r, normal_world);
             Some(rec)
         } else {
