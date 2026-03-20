@@ -4,7 +4,7 @@
         "image_height": 900,
         "spp": 500,
         "max_depth": 50,
-        "output": "dragon"
+        "output": "dragon.png"
     },
 
     "camera": {

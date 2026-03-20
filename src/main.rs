@@ -27,6 +27,7 @@ use crate::{
 #[command(author, version, about)]
 struct Cli {
     scene: String,
+
     #[arg(short, long)]
     output: Option<String>,
 }
@@ -36,13 +37,7 @@ fn main() {
 
     let cli = Cli::parse();
 
-    let mut loaded = match load_scene_from_file(&cli.scene) {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("Error loading scene '{}': {}", cli.scene, e);
-            std::process::exit(1);
-        }
-    };
+    let mut loaded = load_scene_from_file(&cli.scene).expect("Error loading scene");
 
     let output = cli
         .output
@@ -54,14 +49,13 @@ fn main() {
 
     let image = render_gpu(&mut loaded.camera, &loaded.world, &loaded.lights, &bvh, spp);
 
-    let ppm_path = format!("{output}.ppm");
-    let png_path = format!("{output}.png");
+    let output_path = format!("{output}");
 
-    image.save(&ppm_path).expect("Failed to save PPM");
+    // convert to fully using image soon
     image
         .to_rgb_image()
-        .save(&png_path)
-        .expect("Failed to save PNG");
+        .save(&output_path)
+        .expect("Failed to save image");
 
     println!("done");
 }

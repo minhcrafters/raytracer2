@@ -4,7 +4,7 @@
         "image_height": 720,
         "spp": 500,
         "max_depth": 50,
-        "output": "mcworld_render"
+        "output": "mcworld_render.png"
     },
     "camera": {
         "fov": 60,

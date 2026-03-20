@@ -4,7 +4,7 @@
         "image_height": 1200,
         "spp": 500,
         "max_depth": 50,
-        "output": "teapot_hdri"
+        "output": "teapot_hdri.png"
     },
 
     "camera": {

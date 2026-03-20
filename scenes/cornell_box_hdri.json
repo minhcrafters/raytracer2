@@ -4,7 +4,7 @@
         "image_height": 1024,
         "spp": 500,
         "max_depth": 50,
-        "output": "cornell_box_hdri"
+        "output": "cornell_box_hdri.png"
     },
 
     "camera": {

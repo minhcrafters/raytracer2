@@ -4,7 +4,7 @@
         "image_height": 1200,
         "spp": 500,
         "max_depth": 50,
-        "output": "cornell_box"
+        "output": "cornell_box.png"
     },
 
     "camera": {
