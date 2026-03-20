@@ -819,9 +819,7 @@ vec3 trace_path(Ray initial_ray) {
 
             throughput *= sr.attenuation * scattering_pdf / pdf_val;
 
-            // clamp throughput per-bounce to prevent fireflies from
-            // extreme scattering_pdf/pdf_val ratios (especially with HDRI
-            // uniform sphere sampling where pdf ≈ 1/(4π) is very low)
+            // clamp throughput per-bounce to prevent fireflies from hdri
             float max_tp = max(throughput.x, max(throughput.y, throughput.z));
             if (max_tp > 10.0) {
                 throughput *= 10.0 / max_tp;
