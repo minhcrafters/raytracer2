@@ -117,22 +117,3 @@ impl Hittable for Cuboid {
         self
     }
 }
-
-impl Cuboid {
-    fn pdf_value(&self, origin: DVec3, direction: DVec3) -> f64 {
-        let weight = 1.0 / self.faces.len() as f64;
-        let mut sum = 0.0;
-        for face in &self.faces {
-            // we'd need to properly inverse-transform origin and dir for accurate pdf
-            sum += weight * face.pdf_value(origin, direction);
-        }
-        sum
-    }
-
-    fn random(&self, origin: DVec3) -> DVec3 {
-        let int_size = self.faces.len();
-        let rand_idx = (crate::utils::random_f64() * int_size as f64).floor() as usize;
-        let rand_idx = rand_idx.clamp(0, int_size.saturating_sub(1));
-        self.faces[rand_idx].random(origin)
-    }
-}

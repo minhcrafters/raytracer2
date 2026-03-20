@@ -1,7 +1,7 @@
 {
     "render": {
-        "aspect_ratio": 1.3333333333333333,
         "image_width": 1200,
+        "image_height": 900,
         "spp": 500,
         "max_depth": 50,
         "output": "dragon"
@@ -29,7 +29,7 @@
             "type": "diffuse_light",
             "emit": [320.0, 320.0, 320.0]
         },
-        "fill_light": {
+        "mouth_light": {
             "type": "diffuse_light",
             "emit": [800.0, 533.3333, 533.3333]
         },
@@ -61,9 +61,9 @@
             ]
         },
         {
-            "id": "fill_light_sphere",
+            "id": "mouth_light_sphere",
             "type": "sphere",
-            "material": "fill_light",
+            "material": "mouth_light",
             "transforms": [
                 { "type": "scale", "value": [0.05, 0.05, 0.05] },
                 { "type": "translate", "value": [-1.0, 0.71, 0.0] }
@@ -82,5 +82,5 @@
         }
     ],
 
-    "lights": ["key_light_sphere", "fill_light_sphere"]
+    "lights": ["key_light_sphere", "mouth_light_sphere"]
 }

@@ -56,9 +56,9 @@ pub fn load_scene_from_str(json: &str) -> Result<Scene, String> {
 }
 
 fn _load_scene(config: SceneConfig, base_dir: &Path) -> Result<Scene, String> {
-    let (aspect_ratio, image_width, spp, max_depth, output) = render_params(&config);
+    let (image_width, image_height, spp, max_depth, output) = render_params(&config);
 
-    let camera = build_camera(&config, aspect_ratio, image_width, spp, max_depth, base_dir);
+    let camera = build_camera(&config, image_width, image_height, spp, max_depth, base_dir);
 
     let material_map = build_material_map(&config.materials);
 
@@ -125,28 +125,28 @@ fn build_transform(ops: Option<&Vec<TransformOpConfig>>) -> Transform {
     t
 }
 
-fn render_params(config: &SceneConfig) -> (f64, usize, usize, usize, Option<String>) {
+fn render_params(config: &SceneConfig) -> (usize, usize, usize, usize, Option<String>) {
     match &config.render {
         Some(r) => (
-            r.aspect_ratio,
             r.image_width as usize,
+            r.image_height as usize,
             r.spp as usize,
             r.max_depth as usize,
             Some(r.output.clone()),
         ),
-        None => (16.0 / 9.0, 800, 100, 50, None),
+        None => (800, 450, 100, 50, None),
     }
 }
 
 fn build_camera(
     config: &SceneConfig,
-    aspect_ratio: f64,
     image_width: usize,
+    image_height: usize,
     spp: usize,
     max_depth: usize,
     base_dir: &Path,
 ) -> Camera {
-    let mut camera = Camera::new(aspect_ratio, image_width, spp, max_depth);
+    let mut camera = Camera::new(image_width, image_height, spp, max_depth);
     let cam = &config.camera;
 
     camera.fov = cam.fov;

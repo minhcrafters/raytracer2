@@ -9,13 +9,13 @@
         "render": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["aspect_ratio", "image_width", "spp", "max_depth", "output"],
+            "required": ["image_width", "image_height", "spp", "max_depth", "output"],
             "properties": {
-                "aspect_ratio": {
-                    "type": "number",
-                    "exclusiveMinimum": 0
-                },
                 "image_width": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "image_height": {
                     "type": "integer",
                     "minimum": 1
                 },

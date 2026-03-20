@@ -10,8 +10,8 @@ use crate::{
 };
 
 pub struct Camera {
-    pub aspect_ratio: f64,
     pub image_width: usize,
+    pub image_height: usize,
     pub spp: usize,
     pub max_depth: usize,
 
@@ -26,7 +26,6 @@ pub struct Camera {
 
     pub background: Background,
 
-    image_height: usize,
     center: DVec3,
     pixel_samples_scale: f64,
 
@@ -41,10 +40,10 @@ pub struct Camera {
 }
 
 impl Camera {
-    pub fn new(aspect_ratio: f64, image_width: usize, spp: usize, max_depth: usize) -> Self {
+    pub fn new(image_width: usize, image_height: usize, spp: usize, max_depth: usize) -> Self {
         Self {
-            aspect_ratio,
             image_width,
+            image_height,
             spp,
             max_depth,
             fov: 90.0,
@@ -54,7 +53,6 @@ impl Camera {
             defocus_angle: 0.0,
             focus_dist: 10.0,
             background: Background::Color(Color::new(0.5, 0.7, 1.0)),
-            image_height: 0,
             pixel_samples_scale: 1.0 / (spp as f64),
             center: DVec3::ZERO,
 
@@ -112,8 +110,6 @@ impl Camera {
     }
 
     pub fn init(&mut self) {
-        let image_height = (self.image_width as f64 / self.aspect_ratio) as usize;
-        self.image_height = if image_height < 1 { 1 } else { image_height };
         let actual_aspect_ratio = self.image_width as f64 / self.image_height as f64;
 
         self.center = self.look_from;

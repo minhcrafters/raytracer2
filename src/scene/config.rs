@@ -17,8 +17,8 @@ pub struct SceneConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct RenderConfig {
-    pub aspect_ratio: f64,
     pub image_width: u32,
+    pub image_height: u32,
     pub spp: u32,
     pub max_depth: u32,
     pub output: String,
