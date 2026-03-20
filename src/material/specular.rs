@@ -10,17 +10,13 @@ use std::f64::consts::PI;
 
 pub struct Specular {
     pub albedo: Color,
-    pub shininess: f64,
+    pub fuzz: f64,
     pub ior: f64,
 }
 
 impl Specular {
-    pub fn new(albedo: Color, ior: f64, shininess: f64) -> Self {
-        Self {
-            albedo,
-            shininess,
-            ior,
-        }
+    pub fn new(albedo: Color, ior: f64, fuzz: f64) -> Self {
+        Self { albedo, fuzz, ior }
     }
 }
 
@@ -35,14 +31,8 @@ impl Material for Specular {
         let is_specular = random_f64() < reflectance;
 
         if is_specular {
-            let fuzz = if self.shininess > 0.0 {
-                1.0 / self.shininess
-            } else {
-                1.0
-            };
-
             let reflected =
-                ray_in.dir.reflect(hit_record.normal).normalize() + fuzz * random_unit_vec3();
+                ray_in.dir.reflect(hit_record.normal).normalize() + self.fuzz * random_unit_vec3();
             let scattered_ray = Ray::new(hit_record.point, reflected, ray_in.time);
 
             if scattered_ray.dir.dot(hit_record.normal) > 0.0 {

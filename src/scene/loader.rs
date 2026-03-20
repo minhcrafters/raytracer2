@@ -184,11 +184,9 @@ fn build_material_map(
                     ior,
                     roughness,
                 } => Arc::new(Dielectric::new(to_color(color), *ior, *roughness)),
-                MaterialConfig::Specular {
-                    color,
-                    ior,
-                    shininess,
-                } => Arc::new(Specular::new(to_color(color), *ior, *shininess)),
+                MaterialConfig::Specular { albedo, ior, fuzz } => {
+                    Arc::new(Specular::new(to_color(albedo), *ior, *fuzz))
+                }
                 MaterialConfig::DiffuseLight { emit } => {
                     Arc::new(DiffuseLight::new(to_color(emit)))
                 }

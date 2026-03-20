@@ -56,9 +56,9 @@ pub enum MaterialConfig {
         roughness: f64,
     },
     Specular {
-        color: ColorArr,
+        albedo: [f64; 3],
         ior: f64,
-        shininess: f64,
+        fuzz: f64,
     },
     DiffuseLight {
         emit: ColorArr,

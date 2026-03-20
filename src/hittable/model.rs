@@ -84,8 +84,8 @@ impl TriBvhNode {
             let mut bins_bbox = [Aabb::default(); Self::NUM_SAH_BINS];
 
             for face in faces.iter() {
-                let bin = ((face.centroid[axis] - axis_min) / axis_size
-                    * Self::NUM_SAH_BINS as f64) as usize;
+                let bin = ((face.centroid[axis] - axis_min) / axis_size * Self::NUM_SAH_BINS as f64)
+                    as usize;
                 let bin = bin.min(Self::NUM_SAH_BINS - 1);
                 bins_count[bin] += 1;
                 bins_bbox[bin] = Aabb::from_aabbs(&bins_bbox[bin], &face.bbox);
@@ -357,7 +357,12 @@ fn convert_material(
             })
             .unwrap_or(Color::WHITE);
         let ior = mat.refraction_index().unwrap_or(1.5) as f64;
-        return Arc::new(Specular::new(color, ior, shininess as f64));
+        let fuzz = if shininess > 0.0 {
+            1.0 / (shininess as f64)
+        } else {
+            0.0
+        };
+        return Arc::new(Specular::new(color, ior, fuzz));
     }
 
     if let Some(color) = albedo_color() {

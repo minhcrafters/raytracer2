@@ -60,9 +60,9 @@
 
         "chrome": {
             "type": "specular",
-            "color": [0.78, 0.78, 0.82],
+            "albedo": [0.78, 0.78, 0.82],
             "ior": 2.5,
-            "shininess": 8000.0
+            "fuzz": 0.0
         },
 
         "area_light": {

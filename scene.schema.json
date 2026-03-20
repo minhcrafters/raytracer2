@@ -114,13 +114,13 @@
                         },
                         {
                             "type": "object",
-                            "required": ["type", "color", "ior", "shininess"],
+                            "required": ["type", "albedo", "ior", "fuzz"],
                             "additionalProperties": false,
                             "properties": {
                                 "type": { "const": "specular" },
-                                "color": { "$ref": "#/$defs/color" },
+                                "albedo": { "$ref": "#/$defs/color" },
                                 "ior": { "type": "number", "exclusiveMinimum": 0 },
-                                "shininess": { "type": "number", "exclusiveMinimum": 0 }
+                                "fuzz": { "type": "number", "minimum": 0 }
                             }
                         },
                         {

@@ -45,7 +45,7 @@ pub struct GpuMaterial {
     pub ior: f32,
     pub emit: [f32; 3],
     pub fuzz: f32,
-    pub shininess: f32,
+    pub _pad1: u32,
     // for texture-based materials
     pub tex_height: u32,
     pub tex_width: u32,

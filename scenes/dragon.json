@@ -35,9 +35,9 @@
         },
         "dragon_mat": {
             "type": "specular",
-            "color": [0.6353, 0.7882, 0.1098],
+            "albedo": [0.6353, 0.7882, 0.1098],
             "ior": 1.5,
-            "shininess": 10000.0
+            "fuzz": 0.0
         }
     },
 
