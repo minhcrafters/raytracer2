@@ -27,7 +27,7 @@
         },
         "key_light": {
             "type": "diffuse_light",
-            "emit": [320.0, 320.0, 320.0]
+            "emit": [150.0, 150.0, 150.0]
         },
         "mouth_light": {
             "type": "diffuse_light",
